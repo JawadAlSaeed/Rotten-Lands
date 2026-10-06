@@ -17,40 +17,47 @@ path = "res://assets/audio/sfx/parry_final.wav"
 script = ExtResource("1_8i8ux")
 name = "dodge"
 path = "res://assets/audio/sfx/dodge.wav"
+volume_db = -2.0
 pitch_jitter = 0.04
 
 [sub_resource type="Resource" id="Resource_oddbf"]
 script = ExtResource("1_8i8ux")
 name = "jump"
 path = "res://assets/audio/sfx/jump.wav"
+volume_db = -2.0
 
 [sub_resource type="Resource" id="Resource_1xh2r"]
 script = ExtResource("1_8i8ux")
 name = "whiff"
 path = "res://assets/audio/sfx/whiff.wav"
+volume_db = -4.0
 pitch_jitter = 0.04
 
 [sub_resource type="Resource" id="Resource_nyft8"]
 script = ExtResource("1_8i8ux")
 name = "locked"
 path = "res://assets/audio/sfx/locked.wav"
+volume_db = -6.0
 
 [sub_resource type="Resource" id="Resource_t5kpp"]
 script = ExtResource("1_8i8ux")
 name = "hurt"
 path = "res://assets/audio/sfx/hurt.wav"
+volume_db = -3.0
 pitch_jitter = 0.04
 
 [sub_resource type="Resource" id="Resource_a8kml"]
 script = ExtResource("1_8i8ux")
 name = "strike"
 path = "res://assets/audio/sfx/strike.wav"
+volume_db = -2.0
 pitch_jitter = 0.04
 
 [sub_resource type="Resource" id="Resource_b27fb"]
 script = ExtResource("1_8i8ux")
 name = "heavy_strike"
 path = "res://assets/audio/sfx/heavy_strike.wav"
+volume_db = -2.0
 
 [sub_resource type="Resource" id="Resource_8862e"]
 script = ExtResource("1_8i8ux")
@@ -66,62 +73,74 @@ path = "res://assets/audio/sfx/team_counter.wav"
 script = ExtResource("1_8i8ux")
 name = "alert"
 path = "res://assets/audio/sfx/alert.wav"
+volume_db = -3.0
 
 [sub_resource type="Resource" id="Resource_j7rql"]
 script = ExtResource("1_8i8ux")
 name = "lunge"
 path = "res://assets/audio/sfx/lunge.wav"
+volume_db = -4.0
 pitch_jitter = 0.04
 
 [sub_resource type="Resource" id="Resource_pn3l1"]
 script = ExtResource("1_8i8ux")
 name = "slam"
 path = "res://assets/audio/sfx/slam.wav"
+volume_db = -2.0
 
 [sub_resource type="Resource" id="Resource_wf26n"]
 script = ExtResource("1_8i8ux")
 name = "downed"
 path = "res://assets/audio/sfx/downed.wav"
+volume_db = -2.0
 
 [sub_resource type="Resource" id="Resource_fub1v"]
 script = ExtResource("1_8i8ux")
 name = "ap_gain"
 path = "res://assets/audio/sfx/ap_gain.wav"
+volume_db = -6.0
 
 [sub_resource type="Resource" id="Resource_2t21s"]
 script = ExtResource("1_8i8ux")
 name = "turn_start"
 path = "res://assets/audio/sfx/turn_start.wav"
+volume_db = -8.0
 
 [sub_resource type="Resource" id="Resource_050hm"]
 script = ExtResource("1_8i8ux")
 name = "menu_move"
 path = "res://assets/audio/sfx/menu_move.wav"
+volume_db = -10.0
 
 [sub_resource type="Resource" id="Resource_tfr7v"]
 script = ExtResource("1_8i8ux")
 name = "menu_confirm"
 path = "res://assets/audio/sfx/menu_confirm.wav"
+volume_db = -8.0
 
 [sub_resource type="Resource" id="Resource_bgel4"]
 script = ExtResource("1_8i8ux")
 name = "menu_cancel"
 path = "res://assets/audio/sfx/menu_cancel.wav"
+volume_db = -8.0
 
 [sub_resource type="Resource" id="Resource_pfo4v"]
 script = ExtResource("1_8i8ux")
 name = "victory"
 path = "res://assets/audio/sfx/victory.wav"
+volume_db = -4.0
 
 [sub_resource type="Resource" id="Resource_eywhw"]
 script = ExtResource("1_8i8ux")
 name = "defeat"
 path = "res://assets/audio/sfx/defeat.wav"
+volume_db = -4.0
 
 [sub_resource type="Resource" id="Resource_3is6k"]
 script = ExtResource("1_8i8ux")
 name = "metronome"
 path = "res://assets/audio/sfx/metronome.wav"
+volume_db = -2.0
 
 [resource]
 script = ExtResource("2_tmwgw")
