@@ -44,6 +44,8 @@ extends RefCounted
 ##   counter                 {seq, actors:[id], target, team}  followed by a damage event
 ##   turn_ended              {turn, actor}
 ##   practice_changed        {invulnerable_party, immortal_enemies, force_attack}
+##                           also emitted (before timed_sequence_declared) when a forced
+##                           attack is used and force_attack clears
 ##   combat_ended            {result}        "victory" | "defeat"
 ##   command_rejected        {reason, command}   private to the sender; never broadcast/replayed
 
@@ -318,6 +320,8 @@ func _begin_enemy_attack(actor: Combatant, events: Array[Dictionary]) -> bool:
 	if not forced.is_empty() and actor.attack_ids.has(forced):
 		attack = get_attack(forced)
 		practice.force_attack = ""
+		# Announce the clear, or mirrors (HUD practice status) would keep showing the forced attack.
+		events.append(_practice_changed_event())
 	else:
 		var choices: Array[EnemyAttackData] = []
 		var weights: Array[int] = []
@@ -542,12 +546,16 @@ func _cmd_practice(command: Dictionary, events: Array[Dictionary]) -> void:
 		practice.immortal_enemies = bool(command.immortal_enemies)
 	if command.has("force_attack"):
 		practice.force_attack = String(command.force_attack)
-	events.append({
+	events.append(_practice_changed_event())
+
+
+func _practice_changed_event() -> Dictionary:
+	return {
 		"type": "practice_changed",
 		"invulnerable_party": practice.invulnerable_party,
 		"immortal_enemies": practice.immortal_enemies,
 		"force_attack": practice.force_attack,
-	})
+	}
 
 
 # --- timed sequence resolution ----------------------------------------------------------------
