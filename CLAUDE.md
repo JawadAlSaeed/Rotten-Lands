@@ -16,7 +16,8 @@ whenever a decision is made or changed.
 ## Git and GitHub
 
 - Repo: https://github.com/JawadAlSaeed/Rotten-Lands (public). Branch: `main`.
-- Commits are authored by the user (Jawad Al-Saeed <jawadalsaeed266@gmail.com>).
+- Commits are authored by the user as Jawad Al-Saeed <39744682+JawadAlSaeed@users.noreply.github.com>
+  (repo-local `user.email`). GitHub blocks pushes that expose the private Gmail address.
 - **Never credit Claude or Anthropic anywhere in git or GitHub.** No `Co-Authored-By` trailer, no
   "Generated with Claude Code" line, no session links, in commits, PRs, issues or release notes.
   This is enforced by `.claude/settings.json` (attribution off) and by `.githooks/commit-msg`
