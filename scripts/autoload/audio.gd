@@ -89,6 +89,19 @@ func _stream_for(cue: SfxCue) -> AudioStream:
 	return stream
 
 
+## Stops every sound and releases the streams. Called on quit, because quitting while a sound
+## still plays leaks its playback and Godot reports "resources still in use at exit".
+func stop_all() -> void:
+	for player: AudioStreamPlayer in _pool:
+		player.stop()
+		player.stream = null
+	_streams.clear()
+
+
+func _exit_tree() -> void:
+	stop_all()
+
+
 func _warn_once(key: String, message: String) -> void:
 	if _warned.has(key):
 		return
