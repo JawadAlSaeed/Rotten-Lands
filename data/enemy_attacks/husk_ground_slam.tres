@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyAttackData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/attack_hit_data.gd" id="1_82u1l"]
+[ext_resource type="Script" path="res://scripts/data/enemy_attack_data.gd" id="2_ks5ng"]
+
+[sub_resource type="Resource" id="Resource_o7ftp"]
+script = ExtResource("1_82u1l")
+impact_ms = 1100
+kind = 1
+damage_percent = 80
+approach_ms = 450
+
+[resource]
+script = ExtResource("2_ks5ng")
+id = "husk_ground_slam"
+display_name = "Ground Slam"
+target_mode = 1
+hits = Array[ExtResource("1_82u1l")]([SubResource("Resource_o7ftp")])

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EncounterData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_pturf"]
+[ext_resource type="Resource" path="res://data/enemies/rotten_husk.tres" id="2_ud0v2"]
+[ext_resource type="Script" path="res://scripts/data/character_data.gd" id="3_xa2gg"]
+[ext_resource type="Resource" path="res://data/characters/alder.tres" id="4_yawpc"]
+[ext_resource type="Resource" path="res://data/characters/brin.tres" id="5_jhccm"]
+[ext_resource type="Resource" path="res://data/characters/cass.tres" id="6_6n5ke"]
+[ext_resource type="Script" path="res://scripts/data/encounter_data.gd" id="7_v1e11"]
+
+[resource]
+script = ExtResource("7_v1e11")
+id = "phase1_test"
+display_name = "Test Fight"
+party = Array[ExtResource("3_xa2gg")]([ExtResource("4_yawpc"), ExtResource("5_jhccm"), ExtResource("6_6n5ke")])
+enemies = Array[ExtResource("1_pturf")]([ExtResource("2_ud0v2")])

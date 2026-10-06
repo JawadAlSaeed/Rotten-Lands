@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="EnemyAttackData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/attack_hit_data.gd" id="1_pexva"]
+[ext_resource type="Script" path="res://scripts/data/enemy_attack_data.gd" id="2_67ahq"]
+
+[sub_resource type="Resource" id="Resource_bxo58"]
+script = ExtResource("1_pexva")
+impact_ms = 900
+damage_percent = 35
+approach_ms = 180
+
+[sub_resource type="Resource" id="Resource_khxfy"]
+script = ExtResource("1_pexva")
+impact_ms = 1200
+damage_percent = 35
+approach_ms = 180
+
+[sub_resource type="Resource" id="Resource_2jqgj"]
+script = ExtResource("1_pexva")
+impact_ms = 1700
+kind = 1
+damage_percent = 35
+approach_ms = 400
+
+[sub_resource type="Resource" id="Resource_4mfmx"]
+script = ExtResource("1_pexva")
+impact_ms = 2300
+damage_percent = 35
+
+[resource]
+script = ExtResource("2_67ahq")
+id = "husk_rot_combo"
+display_name = "Rot Combo"
+target_mode = 1
+hits = Array[ExtResource("1_pexva")]([SubResource("Resource_bxo58"), SubResource("Resource_khxfy"), SubResource("Resource_2jqgj"), SubResource("Resource_4mfmx")])

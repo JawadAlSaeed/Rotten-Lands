@@ -1,0 +1,23 @@
+#!/bin/sh
+# Keeps AI tools out of the GitHub contributor list.
+# Removes any "Co-Authored-By:" trailer that names Claude or Anthropic,
+# and any "Generated with Claude Code" line, before the commit is saved.
+msg_file="$1"
+tmp_file="$msg_file.tmp"
+
+grep -v -i -E '^[[:space:]]*co-authored-by:.*(claude|anthropic)' "$msg_file" \
+  | grep -v -i -E 'generated with .*claude' \
+  | grep -v -i -E '^[[:space:]]*claude-session:' \
+  > "$tmp_file"
+
+mv "$tmp_file" "$msg_file"
+
+# Refuse the commit if the author email belongs to Anthropic.
+author_email=$(git var GIT_AUTHOR_IDENT | sed -n 's/.*<\(.*\)>.*/\1/p')
+case "$author_email" in
+  *anthropic.com*)
+    echo "commit-msg hook: author email $author_email is not allowed in this repo." >&2
+    exit 1
+    ;;
+esac
+exit 0

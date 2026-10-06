@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_attack_data.gd" id="1_wmv88"]
+[ext_resource type="Resource" path="res://data/enemy_attacks/husk_swipe.tres" id="2_cbueq"]
+[ext_resource type="Resource" path="res://data/enemy_attacks/husk_flurry.tres" id="3_baxc6"]
+[ext_resource type="Resource" path="res://data/enemy_attacks/husk_lingering_claw.tres" id="4_vgvt7"]
+[ext_resource type="Resource" path="res://data/enemy_attacks/husk_ground_slam.tres" id="5_r0fm7"]
+[ext_resource type="Resource" path="res://data/enemy_attacks/husk_rot_combo.tres" id="6_gqtro"]
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="7_rtdrg"]
+
+[resource]
+script = ExtResource("7_rtdrg")
+id = "rotten_husk"
+display_name = "Rotten Husk"
+color = Color(0.47843137, 0.6392157, 0.26666668, 1)
+sprite_path = "res://assets/sprites/enemies/rotten_husk.png"
+portrait_path = "res://assets/sprites/portraits/rotten_husk.png"
+speed = 200
+attacks = Array[ExtResource("1_wmv88")]([ExtResource("2_cbueq"), ExtResource("3_baxc6"), ExtResource("4_vgvt7"), ExtResource("5_r0fm7"), ExtResource("6_gqtro")])

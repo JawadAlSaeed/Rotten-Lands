@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Resource" path="res://data/abilities/basic_attack.tres" id="1_1ht0s"]
+[ext_resource type="Script" path="res://scripts/data/character_data.gd" id="2_3kw7s"]
+[ext_resource type="Script" path="res://scripts/data/ability_data.gd" id="3_mjaex"]
+[ext_resource type="Resource" path="res://data/abilities/heavy_strike.tres" id="4_2ryll"]
+
+[resource]
+script = ExtResource("2_3kw7s")
+id = "alder"
+display_name = "Alder"
+color = Color(0.35686275, 0.49803922, 0.7490196, 1)
+sprite_path = "res://assets/sprites/characters/alder.png"
+portrait_path = "res://assets/sprites/portraits/alder.png"
+power_percent = 90
+speed = 90
+basic_attack = ExtResource("1_1ht0s")
+skills = Array[ExtResource("3_mjaex")]([ExtResource("4_2ryll")])

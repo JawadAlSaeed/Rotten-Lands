@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Resource" path="res://data/abilities/basic_attack.tres" id="1_ae2ok"]
+[ext_resource type="Script" path="res://scripts/data/character_data.gd" id="2_t3nh8"]
+[ext_resource type="Script" path="res://scripts/data/ability_data.gd" id="3_22st3"]
+[ext_resource type="Resource" path="res://data/abilities/heavy_strike.tres" id="4_tuucq"]
+
+[resource]
+script = ExtResource("2_t3nh8")
+id = "cass"
+display_name = "Cass"
+color = Color(0.84705883, 0.72156864, 0.2901961, 1)
+sprite_path = "res://assets/sprites/characters/cass.png"
+portrait_path = "res://assets/sprites/portraits/cass.png"
+basic_attack = ExtResource("1_ae2ok")
+skills = Array[ExtResource("3_22st3")]([ExtResource("4_tuucq")])

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Resource" path="res://data/abilities/basic_attack.tres" id="1_484q2"]
+[ext_resource type="Script" path="res://scripts/data/character_data.gd" id="2_5o51h"]
+[ext_resource type="Script" path="res://scripts/data/ability_data.gd" id="3_bou5o"]
+[ext_resource type="Resource" path="res://data/abilities/heavy_strike.tres" id="4_oe4f0"]
+
+[resource]
+script = ExtResource("2_5o51h")
+id = "brin"
+display_name = "Brin"
+color = Color(0.7607843, 0.27058825, 0.23921569, 1)
+sprite_path = "res://assets/sprites/characters/brin.png"
+portrait_path = "res://assets/sprites/portraits/brin.png"
+power_percent = 120
+speed = 110
+basic_attack = ExtResource("1_484q2")
+skills = Array[ExtResource("3_bou5o")]([ExtResource("4_oe4f0")])

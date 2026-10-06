@@ -1,0 +1,128 @@
+[gd_resource type="Resource" script_class="SfxLibrary" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/sfx_cue.gd" id="1_8i8ux"]
+[ext_resource type="Script" path="res://scripts/data/sfx_library.gd" id="2_tmwgw"]
+
+[sub_resource type="Resource" id="Resource_ne45t"]
+script = ExtResource("1_8i8ux")
+name = "parry"
+path = "res://assets/audio/sfx/parry.wav"
+
+[sub_resource type="Resource" id="Resource_lrnn1"]
+script = ExtResource("1_8i8ux")
+name = "parry_final"
+path = "res://assets/audio/sfx/parry_final.wav"
+
+[sub_resource type="Resource" id="Resource_fsrj5"]
+script = ExtResource("1_8i8ux")
+name = "dodge"
+path = "res://assets/audio/sfx/dodge.wav"
+pitch_jitter = 0.04
+
+[sub_resource type="Resource" id="Resource_oddbf"]
+script = ExtResource("1_8i8ux")
+name = "jump"
+path = "res://assets/audio/sfx/jump.wav"
+
+[sub_resource type="Resource" id="Resource_1xh2r"]
+script = ExtResource("1_8i8ux")
+name = "whiff"
+path = "res://assets/audio/sfx/whiff.wav"
+pitch_jitter = 0.04
+
+[sub_resource type="Resource" id="Resource_nyft8"]
+script = ExtResource("1_8i8ux")
+name = "locked"
+path = "res://assets/audio/sfx/locked.wav"
+
+[sub_resource type="Resource" id="Resource_t5kpp"]
+script = ExtResource("1_8i8ux")
+name = "hurt"
+path = "res://assets/audio/sfx/hurt.wav"
+pitch_jitter = 0.04
+
+[sub_resource type="Resource" id="Resource_a8kml"]
+script = ExtResource("1_8i8ux")
+name = "strike"
+path = "res://assets/audio/sfx/strike.wav"
+pitch_jitter = 0.04
+
+[sub_resource type="Resource" id="Resource_b27fb"]
+script = ExtResource("1_8i8ux")
+name = "heavy_strike"
+path = "res://assets/audio/sfx/heavy_strike.wav"
+
+[sub_resource type="Resource" id="Resource_8862e"]
+script = ExtResource("1_8i8ux")
+name = "counter"
+path = "res://assets/audio/sfx/counter.wav"
+
+[sub_resource type="Resource" id="Resource_vc4v8"]
+script = ExtResource("1_8i8ux")
+name = "team_counter"
+path = "res://assets/audio/sfx/team_counter.wav"
+
+[sub_resource type="Resource" id="Resource_2sva2"]
+script = ExtResource("1_8i8ux")
+name = "alert"
+path = "res://assets/audio/sfx/alert.wav"
+
+[sub_resource type="Resource" id="Resource_j7rql"]
+script = ExtResource("1_8i8ux")
+name = "lunge"
+path = "res://assets/audio/sfx/lunge.wav"
+pitch_jitter = 0.04
+
+[sub_resource type="Resource" id="Resource_pn3l1"]
+script = ExtResource("1_8i8ux")
+name = "slam"
+path = "res://assets/audio/sfx/slam.wav"
+
+[sub_resource type="Resource" id="Resource_wf26n"]
+script = ExtResource("1_8i8ux")
+name = "downed"
+path = "res://assets/audio/sfx/downed.wav"
+
+[sub_resource type="Resource" id="Resource_fub1v"]
+script = ExtResource("1_8i8ux")
+name = "ap_gain"
+path = "res://assets/audio/sfx/ap_gain.wav"
+
+[sub_resource type="Resource" id="Resource_2t21s"]
+script = ExtResource("1_8i8ux")
+name = "turn_start"
+path = "res://assets/audio/sfx/turn_start.wav"
+
+[sub_resource type="Resource" id="Resource_050hm"]
+script = ExtResource("1_8i8ux")
+name = "menu_move"
+path = "res://assets/audio/sfx/menu_move.wav"
+
+[sub_resource type="Resource" id="Resource_tfr7v"]
+script = ExtResource("1_8i8ux")
+name = "menu_confirm"
+path = "res://assets/audio/sfx/menu_confirm.wav"
+
+[sub_resource type="Resource" id="Resource_bgel4"]
+script = ExtResource("1_8i8ux")
+name = "menu_cancel"
+path = "res://assets/audio/sfx/menu_cancel.wav"
+
+[sub_resource type="Resource" id="Resource_pfo4v"]
+script = ExtResource("1_8i8ux")
+name = "victory"
+path = "res://assets/audio/sfx/victory.wav"
+
+[sub_resource type="Resource" id="Resource_eywhw"]
+script = ExtResource("1_8i8ux")
+name = "defeat"
+path = "res://assets/audio/sfx/defeat.wav"
+
+[sub_resource type="Resource" id="Resource_3is6k"]
+script = ExtResource("1_8i8ux")
+name = "metronome"
+path = "res://assets/audio/sfx/metronome.wav"
+
+[resource]
+script = ExtResource("2_tmwgw")
+cues = Array[ExtResource("1_8i8ux")]([SubResource("Resource_ne45t"), SubResource("Resource_lrnn1"), SubResource("Resource_fsrj5"), SubResource("Resource_oddbf"), SubResource("Resource_1xh2r"), SubResource("Resource_nyft8"), SubResource("Resource_t5kpp"), SubResource("Resource_a8kml"), SubResource("Resource_b27fb"), SubResource("Resource_8862e"), SubResource("Resource_vc4v8"), SubResource("Resource_2sva2"), SubResource("Resource_j7rql"), SubResource("Resource_pn3l1"), SubResource("Resource_wf26n"), SubResource("Resource_fub1v"), SubResource("Resource_2t21s"), SubResource("Resource_050hm"), SubResource("Resource_tfr7v"), SubResource("Resource_bgel4"), SubResource("Resource_pfo4v"), SubResource("Resource_eywhw"), SubResource("Resource_3is6k")])

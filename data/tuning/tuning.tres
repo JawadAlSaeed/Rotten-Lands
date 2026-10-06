@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="Tuning" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/tuning.gd" id="1_tuning"]
+
+[resource]
+script = ExtResource("1_tuning")
+parry_window_ms = 150
+dodge_window_ms = 250
+jump_window_ms = 220
+window_late_percent = 35
+whiff_lockout_ms = 300
+input_latency_compensation_ms = 30
+attack_lead_in_ms = 700
+attack_tempo_percent = 100
+attack_recover_ms = 450
+hitstop_parry_ms = 45
+hitstop_parry_final_ms = 110
+hitstop_jump_ms = 40
+hitstop_hurt_ms = 50
+hitstop_counter_ms = 120
+counter_delay_ms = 220
+show_timing_ring = false
+ring_lead_ms = 700
+show_telegraph_flash = true
+show_timing_feedback = true
+base_character_hp = 100
+base_enemy_hp = 1500
+base_party_damage = 40
+base_enemy_hit_damage = 28
+damage_variance_percent = 0
+counter_percent = 150
+team_counter_percent = 120
+start_ap = 1
+max_ap = 9
+ap_per_parry = 1
+ap_per_jump = 0
+timeline_base = 10000
+turn_order_preview = 8
+action_dash_ms = 180
+action_hold_ms = 150
+action_return_ms = 220
+turn_gap_ms = 200
+popup_ms = 900
+practice_tools_enabled = true
+fixed_seed = 0

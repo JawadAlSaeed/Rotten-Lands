@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemyAttackData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/attack_hit_data.gd" id="1_1t7hu"]
+[ext_resource type="Script" path="res://scripts/data/enemy_attack_data.gd" id="2_ke0hc"]
+
+[sub_resource type="Resource" id="Resource_2phlv"]
+script = ExtResource("1_1t7hu")
+impact_ms = 900
+
+[resource]
+script = ExtResource("2_ke0hc")
+id = "husk_swipe"
+display_name = "Swipe"
+weight = 3
+hits = Array[ExtResource("1_1t7hu")]([SubResource("Resource_2phlv")])
