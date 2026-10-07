@@ -5,6 +5,9 @@ extends Node3D
 ## fighters (party on the left facing right, enemies on the right) and short-lived effects
 ## (sparks, slashes, ground-wave crests). All art comes from data paths via AssetLoader.
 
+## Effect animation shape: a slash grows to this scale, a spark shrinks to this one.
+const SLASH_GROWTH: float = 1.3
+const SPARK_END_SCALE: float = 0.4
 ## Effects drawn for one frame at fight start so the first parry has no compile hitch.
 const WARM_UP_ALPHA: float = 0.02
 
@@ -142,23 +145,29 @@ func spawn_sparks(at: Vector3, count: int, alpha: float = 1.0) -> void:
 		var tween := spark.create_tween().set_parallel(true)
 		tween.tween_property(spark, "position", at + dir * dist, seconds).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tween.tween_property(spark, "modulate:a", 0.0, seconds).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tween.tween_property(spark, "scale", Vector3.ONE * 0.4, seconds)
+		tween.tween_property(spark, "scale", Vector3.ONE * SPARK_END_SCALE, seconds)
 		tween.chain().tween_callback(spark.queue_free)
 
 
-## A slash arc at `at`, mirrored for strikes going left.
-func spawn_slash(at: Vector3, facing_right: bool = true, alpha: float = 1.0) -> void:
+## A slash arc at `at`, mirrored for strikes going left, appearing after `delay_ms`. Returns its
+## tween (set_speed_scale(0) on it freezes the slash for a hit-stop).
+func spawn_slash(at: Vector3, facing_right: bool = true, alpha: float = 1.0, delay_ms: int = 0) -> Tween:
 	var slash := _effect_sprite(_slash_texture, BaseMaterial3D.BILLBOARD_ENABLED)
 	slash.position = at
 	slash.flip_h = not facing_right
 	slash.scale = Vector3.ONE * _visuals.slash_scale
 	slash.modulate = Color(1.0, 1.0, 1.0, alpha)
+	slash.visible = delay_ms <= 0
 	add_child(slash)
 	var seconds := float(_visuals.slash_ms) / 1000.0
-	var tween := slash.create_tween().set_parallel(true)
-	tween.tween_property(slash, "scale", Vector3.ONE * _visuals.slash_scale * 1.3, seconds)
-	tween.tween_property(slash, "modulate:a", 0.0, seconds).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.chain().tween_callback(slash.queue_free)
+	var tween := slash.create_tween()
+	if delay_ms > 0:
+		tween.tween_interval(float(delay_ms) / 1000.0)
+		tween.tween_callback(slash.show)
+	tween.tween_property(slash, "scale", Vector3.ONE * _visuals.slash_scale * SLASH_GROWTH, seconds)
+	tween.parallel().tween_property(slash, "modulate:a", 0.0, seconds).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_callback(slash.queue_free)
+	return tween
 
 
 ## Places the ground-wave crests (one per point) at this opacity.

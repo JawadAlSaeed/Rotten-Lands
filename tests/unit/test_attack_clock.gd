@@ -78,3 +78,34 @@ func test_zero_pause_and_restart() -> void:
 	clock.pause_for(START + 1000, 100)
 	clock.start(START + 5000)
 	assert_eq(clock.attack_time_us(START + 6000), 1000, "start() clears old pauses")
+
+
+func test_works_after_36_minutes_of_uptime() -> void:
+	# Time.get_ticks_usec() passes 2^31 after about 36 minutes; pauses must not wrap.
+	var start := 3000000000
+	var clock := AttackClock.new()
+	clock.start(start)
+	clock.pause_for(start + 900000, 110000)
+	assert_true(clock.is_paused(start + 950000))
+	assert_false(clock.is_paused(start + 1010000))
+	assert_eq(clock.attack_time_us(start + 1200000), 1090000)
+	clock.pause_for(start + 1000000, 50000)
+	assert_eq(clock.attack_time_us(start + 1200000), 1050000, "the overlapping pause merges: frozen 900..1050 ms")
+	assert_eq(clock.last_pause_end_us(), start + 1050000)
+
+
+func test_pause_straddling_int32_limit() -> void:
+	var start := 2147483648 - 50000
+	var clock := AttackClock.new()
+	clock.start(start)
+	clock.pause_for(start + 40000, 20000)
+	assert_true(clock.is_paused(start + 55000))
+	assert_eq(clock.attack_time_us(start + 100000), 80000)
+
+
+func test_last_pause_end() -> void:
+	var clock := _clock()
+	assert_eq(clock.last_pause_end_us(), -1)
+	clock.pause_for(START + 1000, 100)
+	clock.pause_for(START + 1500, 50)
+	assert_eq(clock.last_pause_end_us(), START + 1550)

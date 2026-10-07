@@ -12,12 +12,14 @@ signal target_changed(target_id: int)
 const TITLE_SIZE: int = 30
 const ITEM_SIZE: int = 32
 const HINT_SIZE: int = 20
+const DESCRIPTION_SIZE: int = 22
 const MENU_WIDTH: float = 400.0
 const CURSOR := "> "
 
 var _title: Label
 var _items_box: VBoxContainer
 var _hint: Label
+var _description: Label
 var _labels: Array[Label] = []
 var _abilities: Array[AbilityData] = []
 var _ap: int = 0
@@ -43,6 +45,10 @@ func _ready() -> void:
 	_items_box = VBoxContainer.new()
 	_items_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(_items_box)
+	_description = HudStyle.make_label("", DESCRIPTION_SIZE)
+	_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_description.custom_minimum_size = Vector2(MENU_WIDTH, 0.0)
+	column.add_child(_description)
 	_hint = HudStyle.make_label("", HINT_SIZE, HudStyle.TEXT_DIM)
 	column.add_child(_hint)
 	visible = false
@@ -195,7 +201,9 @@ func _redraw() -> void:
 		var ability := _abilities[i]
 		var text := ability.display_name
 		if ability.ap_cost > 0:
-			text += "   %d AP" % ability.ap_cost
+			text += "   costs %d AP" % ability.ap_cost
+		elif ability.ap_gain > 0:
+			text += "   +%d AP" % ability.ap_gain
 		var selected := i == _index
 		_labels[i].text = (CURSOR if selected else "  ") + text
 		var color := HudStyle.TEXT
@@ -204,8 +212,14 @@ func _redraw() -> void:
 		elif selected:
 			color = HudStyle.GOLD
 		_labels[i].label_settings.font_color = color
+	var selected_ability := _abilities[_index]
+	var description := selected_ability.description
+	if not _can_afford(selected_ability):
+		description += "\nNeeds %d AP (you have %d). Parry hits to gain AP." % [selected_ability.ap_cost, _ap]
+	_description.text = description
 	if _choosing_target:
 		var target := _targets[_target_index]
-		_hint.text = "Target: %s   (left/right, Esc/B back)" % String(_target_names.get(target, "?"))
+		_hint.text = "Target: %s   (left/right, %s back)" % [String(_target_names.get(target, "?")),
+				HudStyle.binding_text(&"menu_cancel")]
 	else:
-		_hint.text = "Up/Down choose   Enter/A confirm"
+		_hint.text = "Up/Down choose   %s confirm" % HudStyle.binding_text(&"menu_confirm")

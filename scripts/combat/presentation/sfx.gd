@@ -13,6 +13,13 @@ static func play(cue: String, volume_offset_db: float = 0.0) -> void:
 		audio.call(&"play", cue, volume_offset_db)
 
 
+## Stops every sound (before quitting, so no playback is left running at exit).
+static func stop_all() -> void:
+	var audio := _audio()
+	if audio != null:
+		audio.call(&"stop_all")
+
+
 ## Loads every cue now so the first parry sound has no loading hitch.
 static func preload_all() -> void:
 	var audio := _audio()

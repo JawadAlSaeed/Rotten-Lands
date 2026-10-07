@@ -3,7 +3,9 @@ extends Control
 ## Lag calibration (F2, DESIGN.md 3.2): a big circle flashes with the "metronome" sound on a fixed
 ## beat; the player presses Parry on each beat. Presses are stamped by the same DefenseInput as in
 ## combat (the midpoint of the press interval). The median offset of the last presses becomes the
-## player's lag compensation when they confirm (saved by UserSettings); cancel discards it.
+## player's lag compensation when they confirm (saved by UserSettings, clamped to tuning's
+## calibration bounds); cancel discards it. Presses that spread too widely (pressing by reaction
+## instead of with the beat) cannot be saved.
 
 signal closed
 
@@ -17,6 +19,7 @@ const CIRCLE_IDLE := Color(0.3, 0.32, 0.38)
 const CIRCLE_LIT := Color(1.0, 0.95, 0.7)
 
 var _visuals: CombatVisuals
+var _tuning: Tuning
 var _input: DefenseInput
 var _running: bool = false
 var _first_beat_us: int = 0
@@ -44,8 +47,9 @@ func _ready() -> void:
 	visible = false
 
 
-func setup(visuals: CombatVisuals, input: DefenseInput) -> void:
+func setup(visuals: CombatVisuals, tuning: Tuning, input: DefenseInput) -> void:
 	_visuals = visuals
+	_tuning = tuning
 	_input = input
 	_input.pressed.connect(_on_pressed)
 
@@ -71,8 +75,8 @@ func handle_input(event: InputEvent) -> bool:
 	if not _running:
 		return false
 	if event.is_action_pressed("menu_confirm", false, true):
-		if _offsets_us.size() >= _visuals.calibration_min_presses:
-			PlayerSettings.set_latency_compensation_ms(roundi(_median_us() / 1000.0))
+		if _can_save():
+			PlayerSettings.set_latency_compensation_ms(roundi(_median_us() / 1000.0), _tuning)
 			Sfx.play("menu_confirm")
 			_close()
 		else:
@@ -130,25 +134,47 @@ func _beat_time_us(beat: int) -> int:
 	return _first_beat_us + beat * _visuals.calibration_interval_ms * 1000
 
 
-func _median_us() -> float:
+func _recent() -> Array[int]:
 	var count := mini(_visuals.calibration_sample_count, _offsets_us.size())
 	var recent: Array[int] = []
 	recent.assign(_offsets_us.slice(_offsets_us.size() - count))
-	return DefenseStats.median_us(recent)
+	return recent
+
+
+func _median_us() -> float:
+	return DefenseStats.median_us(_recent())
+
+
+func _spread_ms() -> int:
+	return roundi(DefenseStats.spread_us(_recent()) / 1000.0)
+
+
+func _can_save() -> bool:
+	return _offsets_us.size() >= _visuals.calibration_min_presses and _spread_ms() <= _visuals.calibration_max_spread_ms
 
 
 func _update_text() -> void:
 	var lines := PackedStringArray()
-	lines.append("Press PARRY (Space / RB) exactly when the circle flashes.")
+	var confirm := HudStyle.binding_text(&"menu_confirm")
+	var cancel := HudStyle.binding_text(&"menu_cancel")
+	lines.append("Press PARRY (%s) exactly when the circle flashes." % HudStyle.binding_text(&"defend_parry"))
 	lines.append("Beat %d / %d   presses counted: %d" % [_next_beat, _visuals.calibration_beats, _offsets_us.size()])
 	if _offsets_us.is_empty():
 		lines.append("Median offset: -")
 	else:
-		lines.append("Median offset (last %d): %+d ms" % [mini(_visuals.calibration_sample_count, _offsets_us.size()), roundi(_median_us() / 1000.0)])
-	if _offsets_us.size() >= _visuals.calibration_min_presses:
-		lines.append("Enter / A: save as lag compensation      Esc / B: cancel")
+		var median := roundi(_median_us() / 1000.0)
+		var saved := PlayerSettings.clamp_latency(median, _tuning)
+		var line := "Median offset (last %d): %+d ms   spread %d ms" % [_recent().size(), median, _spread_ms()]
+		if saved != median:
+			line += "   (saves %+d, the limit)" % saved
+		lines.append(line)
+	if _can_save():
+		lines.append("%s: save as lag compensation      %s: cancel" % [confirm, cancel])
+	elif _offsets_us.size() >= _visuals.calibration_min_presses:
+		lines.append("Too uneven to save: press WITH the beat, not after the flash.")
+		lines.append("%s: cancel" % cancel)
 	else:
-		lines.append("Esc / B: cancel")
+		lines.append("%s: cancel" % cancel)
 	_text.text = "\n".join(lines)
 
 

@@ -55,8 +55,10 @@ The acting character picks an action:
 - **Skill**: costs AP. Phase 1 has one placeholder skill per character ("Heavy Strike", 2 AP,
   220%). Phase 2 replaces these with real class kits.
 
-Then the target (left/right to cycle). **When only one target is valid the target step is
-skipped.** A party action animation (dash, strike, return) takes about 0.55 s.
+Then the target (left/right or up/down to cycle). **When only one target is valid the target
+step is skipped.** The menu shows each ability's AP cost or gain and the selected ability's
+description (plus "Needs N AP" when it cannot be afforded). A party action animation (dash,
+strike, return) takes about 0.55 s.
 
 ### 2.3 Enemy turn
 
@@ -66,7 +68,9 @@ skipped.** A party action animation (dash, strike, return) takes about 0.55 s.
 2. A **banner** at the top shows the attack name and either the one targeted character's name or
    "WHOLE PARTY". An alert sound plays once when the attack starts (not per hit).
 3. The attack plays in real time. **Only targeted characters defend.** Each hit is resolved per
-   target (see 3).
+   target (see 3). Targets are marked: red arrows over them until the enemy starts moving, and a
+   red border on their party panels for the whole attack. During a single-target attack the other
+   party members step back and dim, so the lunge lane and the target are clear.
 
 ### 2.4 Defensive actions
 
@@ -80,8 +84,19 @@ skipped.** A party action animation (dash, strike, return) takes about 0.55 s.
   them fails. Jumping into a normal hit fails.
 - A press that matches nothing is a **whiff**: that player's defence buttons are locked for
   `whiff_lockout_ms` (300). **Pressing while locked restarts the lock.** A simulation showed this
-  drops mashing success to 0% while an honest miss costs only that one hit.
+  drops mashing success to 0% while an honest miss costs only that one hit. An isolated LATE
+  whiff (no other press in the 300 ms before it) locks only until the next hit's first window
+  opens (or not at all if it is already open), so a late press in a 300 ms string does not also
+  cost the next hit. Presses close together never get this; a mash that happens to start with a
+  late press can land one lucky press (a simulation measured under 5% per attack).
 - One press defends one hit per character.
+- A press shortly after a hit already landed (within `late_press_report_ms`, 400, of its impact)
+  counts as a LATE whiff on that hit when it is nearer than the next hit, so a late reaction shows
+  "LATE +150" instead of nothing or "EARLY" on the next hit. A press after a later hit was
+  defended is never blamed on the earlier one (a double tap after the final parry is ignored).
+- When a target goes down mid-attack its remaining hits are void: they cannot be defended or
+  blamed, and once every target is down the rest of the attack is only animation (presses are
+  ignored).
 
 ### 2.5 Counters
 
@@ -91,13 +106,15 @@ skipped.** A party action animation (dash, strike, return) takes about 0.55 s.
 - If the attack was party-wide and **every** targeted character perfectly defended every hit,
   they strike together as one **Team Counter**: one hit whose damage is `team_counter_percent`
   (120%) of each character's power, added up (about 150 with the phase 1 party, 10% of the
-  enemy). It has its own banner and effect.
+  enemy). It has its own banner ("TEAM COUNTER!"), the attackers keep part of their formation at
+  the strike point, and each lands its own slash. A solo counter shows "COUNTER!" over the enemy.
+  Both freeze their slashes for the counter hit-stop.
 - Phase 1 note: one player controls all three, so every perfect party-wide defence is a team
   counter. In phase 5, when several humans must sync, the team counter gets stronger again.
 - If only some targets of a party-wide attack were perfect, each of those counters on their own.
 - A character downed during the attack cannot counter, so no team counter that time.
-- The counter starts `counter_delay_ms` (220) after the final hit-stop: the reward follows the
-  last parry immediately.
+- The counter starts `counter_delay_ms` (220) after the final hit-stop ends: the reward follows
+  the last parry immediately.
 
 ### 2.6 AP (action points)
 
@@ -166,10 +183,12 @@ under the parry window's early part.
   any `_process`, so the stamp does not depend on when game logic looks at input. Accuracy is
   bounded by how often the OS events are pumped (once per frame on Windows): at 60 fps the error
   is at most about 16 ms. Windows are 150 ms or more.
-- Each press is stamped as an **interval**: from the previous input pump (recorded every frame by a
-  node that processes first) to the moment it arrived. A press counts if any part of that interval
-  is inside a window (reaching back at most 100 ms). This removes the half-frame bias and turns a
-  frame hitch into leniency instead of an unfair miss. The timing readout uses the midpoint.
+- Each press is stamped as an **interval**: from the previous input pump (recorded by
+  `DefenseInput` on the `SceneTree.process_frame` signal) to the moment it arrived. A press counts
+  if any part of that interval is inside a window (reaching back at most `press_reach_back_max_ms`,
+  100). This removes the half-frame bias and turns a frame hitch into leniency instead of an unfair
+  miss. The timing readout uses the midpoint. Prompts that expire inside such a capped press still
+  get their hit-taken feedback on the next frame.
 - Presses are forwarded to the judge straight from `_input`, before the per-frame `advance()`, so a
   late-delivered press is never expired first.
 - The judge never asks "was the button pressed this frame". It compares the stamp with each
@@ -187,10 +206,13 @@ under the parry window's early part.
 - The impact a player sees reaches the screen 1 to 3 frames after it is scheduled, plus pad lag,
   so honest presses arrive about 30 to 70 ms "late". `input_latency_compensation_ms` (tuning,
   default 30) is subtracted from every press time (and from the clock used to expire prompts).
-- **Calibration (F2 in a fight):** a flash plus tick every 750 ms; press Parry on each. The median
-  offset of the last 8 presses becomes the player's compensation, saved per machine in
-  `user://settings.cfg` (it overrides the tuning default). The F1 overlay also shows the rolling
-  median offset of real parries.
+- **Calibration (F2 while the action menu is open):** a flash plus tick every 750 ms; press Parry
+  on each. The median offset of the last 8 presses becomes the player's compensation, saved per
+  machine in `user://settings.cfg` (it overrides the tuning default). The saved and used value is
+  kept within `calibration_min_ms` .. `calibration_max_ms` (tuning, -50 .. 150), and the panel
+  refuses to save when the middle half of the presses spreads wider than
+  `calibration_max_spread_ms` (60): that means pressing by reaction to the flash, not with the
+  beat. The F1 overlay also shows the rolling median offset of real parries and of all presses.
 
 ### 3.3 Attack clock and hit-stop
 
@@ -201,9 +223,12 @@ under the parry window's early part.
 - One `AttackClock` per machine, shared by all local judges. Hit-stop is only triggered by this
   machine's own judges (a remote ally's parry shows a popup but does not pause your clock).
 - Hit-stop lengths (tuning): parry mid-string 45 ms, parry on the final hit 110 ms, jump 40 ms,
-  hit taken 50 ms (so a string keeps a similar rhythm whether you parry it or not), dodge 0,
-  counter 120 ms.
-- **Presses during a freeze are ignored** (no judgement, no lockout).
+  hit taken 50 ms (only on an attack's last hit: a missed hit is judged about 118 ms after impact,
+  when in a string the next lunge has often started, and freezing that looks like a stutter),
+  dodge 0, counter 120 ms.
+- **Presses during a success freeze (parry, jump) are ignored** (no judgement, no lockout). The
+  hurt freeze on an attack's last hit is the exception: every prompt is already resolved, so such
+  a press can only be a LATE report, judged at the time it would have had without the freeze.
 - Press stamps are converted from real time to attack time before judging.
 
 ### 3.4 Windows
@@ -218,14 +243,18 @@ them in the declared event; judges only read the event.
 
 ### 3.5 Judging a press (`DefenseJudge`, pure, unit-tested)
 
-One judge per local player, holding the prompts of the characters that player answers for.
+One judge per local player, holding the prompts of the characters that player answers for
+(phase 1: one player, one judge with every prompt).
 
 1. `advance(now)` every frame: prompts whose windows have all closed resolve as NONE.
 2. Press while locked out: ignored and the lockout restarts.
 3. For each character the player controls: the press resolves that character's earliest
    unresolved prompt whose window for that button contains the press time.
 4. No match: whiff with a reason: EARLY, LATE, or WRONG_ACTION (wrong button for the nearest
-   hit); lockout starts.
+   hit); lockout starts. A hit that already landed less than `late_press_report_ms` before the
+   press counts as "nearest" when it is nearer than the next unresolved hit and no later hit was
+   defended (a LATE whiff on it). An isolated LATE whiff locks only until the next hit's first
+   window opens. Voided prompts (character down) never match and are never blamed.
 5. Results are released strictly in prompt order and sent to the engine as `resolve_prompts`.
    A later prompt that resolved first waits in the buffer (prevents a deadlock when, for example,
    a jump for a ground hit lands before an earlier normal hit expires).
@@ -235,26 +264,50 @@ One judge per local player, holding the prompts of the characters that player an
 - **Decide early, show at contact:** a valid early press decides the outcome at once, but its
   clang, flash, sparks and the start of hit-stop play at attack time `max(press, impact)`.
 - Defence poses hold from the press until at least impact + late edge: parry stance 150 ms or
-  more, dodge 250 ms or more, jump airtime about 480 ms with the apex near impact.
-- A hit that lands: contact shows at T with the enemy holding the contact pose; damage and flinch
-  apply when the window closes (at most 88 ms later).
+  more, dodge 250 ms or more, jump airtime about 480 ms with the apex at impact when the press
+  leaves time for it, else a fast rise (`jump_rise_fast_ms`, 60). A jump's contact moment (thump,
+  readout, hit-stop) is at `max(impact, the moment the body is 60% up)`, so the freeze never shows
+  a successful jump standing in the wave.
+- A hit that lands: contact shows at T; damage and flinch apply when the window closes, at the
+  late edge plus lag compensation (about 118 ms after impact by default). On an attack's last hit
+  the enemy holds its contact pose until `contact_after_close_ms` (70) past that, so the flinch and
+  hurt freeze show it still in contact; between hits the hold is capped so the recoil keeps
+  `recoil_min_ms`, so in tight strings the flinch can overlap the next lunge's start. A ground
+  wave stays fully visible until its hit closes, then fades over `wave_fade_ms` (150).
+- One readout per press, above the defenders' standing heads (a jump's lift is ignored), even
+  when it answered several characters. Popups that share a column stack: the newest at its spot,
+  older ones pushed above it, so a column reads oldest at the top and nothing overlaps; a popup
+  pushed up against the attack banner or timeline stops there and fades out quickly instead of
+  being hidden under it. "MISS"
+  shows only when no press was made for that hit (an EARLY or wrong-button whiff on it counts).
+- A whiff never cuts short a successful defence or a flinch that is still playing (a double tap
+  keeps the jumper in the air); it still flashes, sounds and shows its readout.
+- The lock icon sits under the defenders' feet, clear of the readouts.
 - Feedback comes from the local judge at press time, never from engine events (so it stays
   instant online): "PARRY" / "DODGE" / "JUMP" plus the offset ("+12"), whiffs as "EARLY -130"
   (blue) or "LATE +70" (red), wrong button as "JUMP!" / "PARRY!" hints (orange), "MISS" when a hit
   lands with no press, a lock icon during lockout, a muted click for a locked press.
 - Distinct sounds: parry clang (brighter on the final hit), dodge whoosh, jump thump, hit taken,
   whiff swish, locked click.
+- Parry sparks burst on the defender's front edge (`spark_toward_enemy`). Screen shake is stronger
+  on a parry than on a hit taken (parry 0.09, final parry 0.14, hurt 0.1).
 
 ### 3.7 Cues (all toggleable)
 
 - Wind-up glow that ramps while the enemy holds, and a visible lunge of fixed length
   (`approach_ms`, about 200 ms) into an obvious contact point. Feints start a lunge, stop, hold,
   then do the real lunge.
-- Telegraph flash when each lunge starts (`show_telegraph_flash`).
+- Telegraph flash when each lunge, feint start or slam starts (`show_telegraph_flash`, F1 then F).
+  It is red-orange (`telegraph_flash_color`), never white: white on the enemy means "you parried".
 - One alert sound when the attack starts.
+- Motion sounds (`play_motion_sounds`, F1 then L): a whoosh as each lunge or feint starts and a
+  slam as a ground wave launches. They are the sound of the motion the player is reading, so they
+  start with it (about 200 ms before impact), not on a beat.
 - **Training ring** (`show_timing_ring`, **off by default**, toggle with F1 then R): shrinks onto
-  the target and closes at impact. Never shown on attacks with `allow_timing_ring = false`.
-- Timing readout after each press (`show_timing_feedback`).
+  the target and closes at impact. Never shown on attacks with `allow_timing_ring = false`. The
+  toggle is saved per machine in `user://settings.cfg` and overrides the tuning default.
+- Timing readout after each press (`show_timing_feedback`, F1 then T).
+- F and T and L are session toggles (not saved); the tuning values are their starting state.
 
 ---
 
@@ -266,7 +319,7 @@ One judge per local player, holding the prompts of the characters that player an
  HUD menus ──> CombatController ──commands──> CombatEngine (pure, deterministic)
                  │   ^                               │
                  │   └──── TimedSequenceRunner ◄─────┘ events
-                 │          (AttackClock + one DefenseJudge per local player)
+                 │          (AttackClock + one DefenseJudge per local player; phase 1: one)
                  └──events──> CombatMirror ──> CombatView / HUD / Audio (presentation)
 ```
 
@@ -280,16 +333,21 @@ One judge per local player, holding the prompts of the characters that player an
 | Controller | `scripts/combat/presentation/combat_controller.gd` | everything; owns the engine |
 | Presentation | `scripts/combat/presentation/` | nodes, tweens, audio; reads the **mirror**, never the engine |
 | Input | `scripts/combat/input/` | `_input` and the clock |
+| Shared helpers | `scripts/core/` | `AssetLoader` (textures with a checkerboard fallback) |
+| Autoloads | `scripts/autoload/` | `Audio` (sound cues), `UserSettings` / `PlayerSettings` (per-machine settings) |
 
 ### 4.2 Engine API (`CombatEngine`)
 
 - `CombatEngine.new(setup: CombatSetup)`: party data, enemy data, tuning, seed, `allow_practice`.
-- `start() -> Array[Dictionary]`: events for fight start and the first turn.
+- `start() -> Array[Dictionary]`: events for fight start and the first turn (or one
+  `command_rejected` with `already_started` / `invalid_setup`).
 - `submit(command) -> Array[Dictionary]`: the only way to change state. A command is fully
   validated before anything changes; an invalid one returns a single `command_rejected` event,
   which is private to the sender (never broadcast or replayed).
 - Queries (controller and tests only): `phase`, `active_actor`, `turn_number`, `sequence`,
-  `pending_prompts()`, `get_combatant(id)`, `preview_turn_order(n)`, `snapshot()`.
+  `pending_prompts()`, `get_combatant(id)`, `preview_turn_order(n)`, `snapshot()`, `party_ids()`,
+  `enemy_ids()`, `living_party_ids()`, `living_enemy_ids()`, `get_ability(id)`, `get_attack(id)`,
+  `can_afford(actor_id, ability_id)`. Presentation never reads them for display (rule 7).
 - `CombatEngine.restore(setup, snapshot)` rebuilds an engine (reconnects, desync debugging).
 
 Phases: `AWAITING_ACTION` (a party member must act), `AWAITING_TIMING` (a timed sequence has
@@ -341,7 +399,9 @@ built fresh, never sharing containers with engine state. Persist logs with `var_
   applied to the mirror at once (their effects were already shown locally). Everything from
   `sequence_resolved` on (counters, next turn, victory) waits until the local attack animation
   ends.
-- Test: after every fight, the mirror's projection equals the engine snapshot's projection.
+- Test: after every fight, the mirror's projection equals the engine snapshot's projection. The
+  autoplay bot checks the same on the real playback path at the end of every fight and prints
+  `AUTOPLAY_ERROR mirror_mismatch` if they differ.
 
 ---
 
@@ -351,7 +411,8 @@ built fresh, never sharing containers with engine state. Persist logs with `var_
 
 | Script | Folder | Holds |
 |---|---|---|
-| `Tuning` | `data/tuning/tuning.tres` | every global number (windows, damage, HP, AP, cues, pacing) |
+| `Tuning` | `data/tuning/tuning.tres` | every global rules and judging number (windows, lockout, lag compensation and its bounds, damage, HP, AP, hit-stop, cue toggles, pacing) |
+| `CombatVisuals` | `data/presentation/combat_visuals.tres` | presentation only: FX/stage/UI art paths, stage layout, camera, enemy choreography feel (feint lead, contact hold, recoil), pose lengths, jump shape, flash/shake strengths, popup and banner feel, calibration procedure |
 | `CharacterData` | `data/characters/` | id, name, colour, sprite paths, hp/power %, speed, abilities |
 | `AbilityData` | `data/abilities/` | id, name, AP cost, AP gain, damage %, targeting, sound |
 | `EnemyData` | `data/enemies/` | id, name, sprite paths, hp/power %, speed, attacks |
@@ -367,6 +428,11 @@ values appear in the Inspector on the right, each with a tooltip). Balance chang
 file, never by changing the defaults in `tuning.gd`. `tools/bootstrap_data.gd` writes it with
 every value spelled out.
 
+The split: `tuning.tres` holds what changes rules or judging (and the cue on/off defaults);
+`combat_visuals.tres` holds how things look and feel on screen. The one link between them: the
+calibration procedure (in `combat_visuals.tres`) produces the lag compensation the judge uses,
+clamped by tuning's calibration bounds.
+
 ### 5.3 Assets and placeholders
 
 - Sprites: `assets/sprites/<group>/<id>.png`. Sounds: `assets/audio/sfx/<cue>.wav`.
@@ -378,10 +444,14 @@ every value spelled out.
   replace a placeholder, overwrite the file with a new one of the same name. `run_game.bat` imports
   new files before starting, so dropped-in art and sounds just work.
 - Import defaults in `project.godot`: textures never VRAM-compressed and no mipmaps (even when used
-  in 3D); WAV kept as PCM. Every `Sprite3D` uses nearest filtering and alpha-cut discard. A test
-  checks the `.import` files.
+  in 3D); WAV kept as PCM. Every `Sprite3D` uses nearest filtering; fighters and the backdrop use
+  alpha-cut discard, effects and shadows use alpha blending (their fades need it). A test checks
+  the `.import` files.
 - Placeholders are generated by `tools/gen_placeholders.gd` (pixel sprites and synthesized
-  sounds). It only creates files that are missing, so real art is never overwritten.
+  sounds) at the paths named in the data files (characters, enemies, sound library and
+  `combat_visuals.tres`). It only creates files that are missing, so real art is never overwritten.
+- Popups and icons sit above the visible top of a fighter's art (the opaque pixels of frame 0),
+  so empty space at the top of a frame does not push them up.
 - All textures use nearest-neighbour filtering (pixel art stays sharp).
 - `AssetLoader.texture(path)` returns a visible checkerboard if a file is missing; `Audio.play()`
   stays silent with one warning.
@@ -406,7 +476,14 @@ which phase 5 uses to assign devices to players.
 
 Phase 1 practice keys (keyboard only, when `practice_tools_enabled`): 1 to 5 force the enemy's
 next attack, I toggles "party cannot die", O toggles "enemy cannot die", R restarts the fight,
-F1 opens the stats overlay (R inside it toggles the training ring), F2 starts lag calibration.
+F1 opens the stats overlay (inside it: R training ring, F telegraph flash, T timing readout,
+L motion sounds), F2 starts lag calibration (only while the action menu is open, never during an
+enemy attack). With `practice_tools_enabled` off, F1 and F2 are not available during a fight.
+On the victory/defeat screen F1 opens the stats, and Confirm or R fights again once
+`end_input_guard_ms` (800) has passed, so a late defence press never skips the screen.
+
+On-screen control hints are built from the Input Map (`HudStyle.binding_text`), so remaps made in
+Project Settings > Input Map show up in the hints.
 
 Menus and defence never run at the same time, so shared buttons do not clash. Godot's built-in
 `ui_accept` no longer includes Space (so a parry can never click a menu button) and gains pad A;
@@ -423,10 +500,14 @@ driven by the `menu_*` actions. Hit-stop never uses `SceneTree.paused` or `Engin
 - 3D stage; characters and enemy are pixel-art sprites drawn as billboards, nearest filtering.
 - Fixed 3/4 camera with shake and punch-in on hits, parries and counters.
 - HUD: timeline row (top left), attack banner (top centre), party panels with HP and AP pips
-  (bottom), enemy HP bar, action menu, damage numbers, defence result popups and timing readout,
-  controls hint, practice status, victory/defeat screen (Confirm or R to fight again).
-- F1 overlay: per-action success rates, mean and spread of timing offsets, rolling median offset,
-  current compensation, toggles.
+  (bottom, in the same left-to-right order as the fighters), enemy HP bar, action menu, damage
+  numbers, defence result popups and timing readout, controls hint (with "Ground wave: Jump only"
+  and "Parry every hit: counterattack"), practice status, victory/defeat screen with a one-line
+  summary: enemy hits, successful parries, dodges and jumps (one press that answers several
+  characters counts once) and counters (Confirm or R to fight again).
+- F1 overlay (right column, clear of the fighters): per-action success rates, mean and spread of
+  timing offsets, whiffs split into early / late / wrong button, rolling median offset of parries
+  and of all timed presses, current compensation, fps, vsync, audio latency, longest frame, toggles.
 - Feedback: hit-stop and white flash on parry, sparks, sounds per action, screen shake on hits.
 
 ### 7.2 Phase 3 (HD-2D)
@@ -482,9 +563,15 @@ equipped by one character. No progression between runs in v1.
   reasons, release order (the normal@0 + ground@150 + jump@30 case), latency compensation,
   attack clock pauses, data file validation (2.9 rules).
 - Smoke test: `--autoplay` bot plays a full fight headless (`=perfect`, `=miss`, `=mash`), aiming
-  at window centres. At the end the game prints one line `AUTOPLAY_RESULT victory|defeat` and quits.
-  Run it with `--quit-after 40000` as a hard cap and fail if that line is missing or the log has a
-  script error. Data validation tests check meaning (ids unique, times increasing, spacing rules,
+  at window centres. At the end the game prints `AUTOPLAY_RESULT victory|defeat` and an
+  `AUTOPLAY_STATS` line, then quits (with `--quit-on-end`). Problems print `AUTOPLAY_ERROR ...`
+  (a rejected command, or the mirror not matching the engine). Run it with `--quit-after 60000` as
+  a hard cap and a `timeout`, and fail if the result line is missing (a hang) or the log has an
+  ERROR or AUTOPLAY_ERROR line.
+- Also covered: attack clock with timestamps past 2^31 us (36 minutes of uptime), late presses
+  reported as LATE on a landed hit, prompts expired inside a capped press, enemy choreography
+  (every lunge reaches contact exactly at impact, contact holds until the hit closes, cue times),
+  defence statistics and the calibration clamp. Data validation tests check meaning (ids unique, times increasing, spacing rules,
   paths exist, weights > 0), not just loading.
 
 ---
@@ -533,3 +620,16 @@ equipped by one character. No progression between runs in v1.
 | 2026-10-06 | Asset paths stored as raw res:// paths | readable, reskinnable data; survives file replacement |
 | 2026-10-06 | Space removed from ui_accept | the parry key must never confirm a menu |
 | 2026-10-06 | Test runner fails on unloaded test files | GUT alone reports success when a test file has a parse error |
+| 2026-10-07 | `tuning.tres` = rules and judging, `combat_visuals.tres` = look and feel | one place per question; presentation tweaks never touch balance |
+| 2026-10-07 | A press soon after a hit landed reports LATE on that hit (`late_press_report_ms` 400) | reacting late is the most common beginner miss; it must say LATE, not nothing or EARLY |
+| 2026-10-07 | Hurt hit-stop only on an attack's last hit | a missed hit is judged ~118 ms after impact, often after the next lunge started |
+| 2026-10-07 | Enemy holds contact until the hit closes; ground wave stays until then | a missed hit's flinch and damage appear while the cause is still on screen |
+| 2026-10-07 | Jump contact (sound, popup, freeze) when the body is clear of the wave | the freeze must never show a successful jump standing in the wave |
+| 2026-10-07 | Lunge whoosh and slam sounds kept, toggle with F1 then L | they are the sound of the motion being read, not a beat; can be turned off to test |
+| 2026-10-07 | Calibration clamped to -50 .. 150 ms and refused when presses spread > 60 ms | a reaction-based calibration would shift every window late |
+| 2026-10-07 | Single-target attacks: bystanders step back and dim; targets get arrows and red panels | with a staggered formation the lunge otherwise lands in front of an ally |
+| 2026-10-07 | Telegraph flash red-orange, parry flash white | one colour must mean one thing |
+| 2026-10-07 | Isolated LATE whiff locks only until the next hit's window opens | in a 300 ms string a full lockout made one late press cost two or three hits |
+| 2026-10-07 | Presses during the last hit's hurt freeze are judged (as LATE) | otherwise the most common late band (~+90..+140 ms) showed nothing |
+| 2026-10-07 | Popups stack per column with a ceiling under the banner | readouts must never overlap or hide under the banner |
+| 2026-10-07 | One movement tween per fighter (`FighterView.move_body`) | two tweens on one body made team counters snap back home |

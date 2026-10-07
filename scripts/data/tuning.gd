@@ -1,6 +1,8 @@
 class_name Tuning
 extends Resource
-## Every global timing and balance number in the game.
+## Every global rules, timing-window and balance number in the game (what the engine and the
+## defence judge use). Presentation-only feel (stage layout, animation, flash strengths, camera,
+## the calibration procedure) lives in data/presentation/combat_visuals.tres instead.
 ## Edit the values in data/tuning/tuning.tres (double-click it in the editor's FileSystem panel;
 ## the values appear in the Inspector, each with a tooltip).
 ## Per-move numbers (how many hits, when they land, percentages) live in each move's own file and
@@ -22,6 +24,16 @@ extends Resource
 ## Default lag compensation, subtracted from every press time to cancel screen and pad lag.
 ## The calibration (F2 in a fight) measures your own value and overrides this one.
 @export_range(-200, 200, 1, "suffix:ms") var input_latency_compensation_ms: int = 30
+## Smallest and largest lag compensation the calibration may save (and the game will use).
+## Keeps a reaction-based calibration (pressing after the flash) from shifting every window.
+@export_range(-200, 0, 1, "suffix:ms") var calibration_min_ms: int = -50
+@export_range(0, 300, 1, "suffix:ms") var calibration_max_ms: int = 150
+## A press is judged over the time since the previous frame (so a slow frame never costs you a
+## parry). This caps how far back that reaches, in milliseconds.
+@export_range(0, 250, 1, "suffix:ms") var press_reach_back_max_ms: int = 100
+## A press this long after a hit already landed is shown as LATE for that hit (when it is nearer
+## than the next hit) instead of being ignored.
+@export_range(0, 1000, 1, "suffix:ms") var late_press_report_ms: int = 400
 
 @export_group("Enemy attack pacing")
 ## Pause between the attack banner appearing and the attack starting.
@@ -37,11 +49,12 @@ extends Resource
 @export_range(0, 500, 1, "suffix:ms") var hitstop_parry_final_ms: int = 110
 ## Freeze on a successful jump.
 @export_range(0, 200, 1, "suffix:ms") var hitstop_jump_ms: int = 40
-## Freeze when a hit lands on you, so a string keeps a similar rhythm whether you parry or not.
+## Freeze when the last hit of an attack lands on you. Earlier hits of a string do not freeze:
+## by the time a missed hit is judged, the next lunge has often started.
 @export_range(0, 200, 1, "suffix:ms") var hitstop_hurt_ms: int = 50
 ## Freeze when a counterattack lands.
 @export_range(0, 500, 1, "suffix:ms") var hitstop_counter_ms: int = 120
-## Delay between the last parry and the counterattack starting.
+## Delay between the end of the final hit-stop and the counterattack starting.
 @export_range(0, 1000, 1, "suffix:ms") var counter_delay_ms: int = 220
 
 @export_group("Timing cues")
@@ -54,6 +67,9 @@ extends Resource
 @export var show_telegraph_flash: bool = true
 ## After each defence press, show how early or late it was (for example "LATE +23").
 @export var show_timing_feedback: bool = true
+## A whoosh when the enemy starts each lunge or slam (the sound of the motion). Toggle in a fight
+## with F1 > L.
+@export var play_motion_sounds: bool = true
 
 @export_group("HP and damage")
 ## HP of a character at 100% hp.

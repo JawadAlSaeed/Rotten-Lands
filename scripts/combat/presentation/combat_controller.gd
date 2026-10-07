@@ -16,11 +16,11 @@ signal menu_opened(actor_id: int)
 signal combat_finished(result: String)
 
 const QUIT_DELAY_S: float = 1.0
+## After stopping all sounds, quitting waits this long (real time) so the audio server lets go of
+## the playbacks; two frames are not enough and Godot reports "resources still in use at exit".
+const QUIT_AUDIO_RELEASE_S: float = 0.3
 const PRACTICE_ATTACK_KEYS: Array[Key] = [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5]
 const PRACTICE_KEYS_PER_LINE: int = 3
-## Party members dashing together (team counter) stand this far apart (world units).
-const TEAM_SPREAD: float = 0.9
-const TEAM_BANNER_MS: int = 1100
 
 var mirror := CombatMirror.new()
 var engine: CombatEngine
@@ -38,7 +38,13 @@ var _queue: Array[Dictionary] = []
 var _playing: bool = false
 var _waiting_runner: bool = false
 var _ended: bool = false
+var _ended_at_us: int = 0
 var _menu_turn: int = -1
+## This fight's numbers for the end screen: successful presses per Defense.Outcome (one press
+## answering three characters counts once), enemy hits as distinct "seq:hit" keys, counters.
+var _defended: Dictionary = {}
+var _enemy_hits: Dictionary = {}
+var _counters: int = 0
 ## Combatant id -> CharacterData or EnemyData.
 var _data_by_id: Dictionary = {}
 ## Ability id -> AbilityData.
@@ -69,13 +75,14 @@ func _ready() -> void:
 	hud.setup(view, _visuals, _tuning)
 	hud.action_menu.chosen.connect(_on_ability_chosen)
 	hud.action_menu.target_changed.connect(_on_target_changed)
-	hud.calibration.setup(_visuals, defense_input)
+	hud.calibration.setup(_visuals, _tuning, defense_input)
 
 	runner = TimedSequenceRunner.new()
 	runner.name = "SequenceRunner"
 	add_child(runner)
 	runner.setup(_submit, _apply_now, mirror, view, hud, _tuning, _visuals, _options, defense_input)
 	runner.finished.connect(_on_runner_finished)
+	runner.press_judged.connect(_on_press_judged)
 
 	if _options.is_autoplay():
 		autoplay = Autoplay.new()
@@ -99,7 +106,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	hud.overlay.update_text(_options.stats, _tuning, _options, runner.longest_frame_ms())
+	hud.overlay.update_text(_options.stats, _tuning, _options, runner.longest_frame_ms(), _ended)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -109,6 +116,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var key := _pressed_key(event)
 	if _ended:
+		if event.is_action_pressed("debug_overlay", false, true):
+			hud.overlay.toggle()
+			get_viewport().set_input_as_handled()
+			return
+		# A defence press still in flight when the fight ends must not skip the end screen.
+		if Time.get_ticks_usec() - _ended_at_us < _visuals.end_input_guard_ms * 1000:
+			return
 		if event.is_action_pressed("menu_confirm", false, true) or key == KEY_R:
 			get_viewport().set_input_as_handled()
 			restart_requested.emit()
@@ -178,8 +192,11 @@ func _pump() -> void:
 ## Applies an event to the mirror right now (runner prompt events, practice changes).
 func _apply_now(ev: Dictionary) -> void:
 	mirror.apply(ev)
-	if String(ev.get("type", "")) == "downed":
-		_show_downed(int(ev.target))
+	match String(ev.get("type", "")):
+		"downed":
+			_show_downed(int(ev.target))
+		"prompt_resolved":
+			_enemy_hits["%d:%d" % [int(ev.seq), int(ev.hit)]] = true
 	_refresh()
 	event_played.emit(ev)
 
@@ -283,17 +300,42 @@ func _on_target_changed(target_id: int) -> void:
 
 func _on_combat_ended(result: String) -> void:
 	_ended = true
+	_ended_at_us = Time.get_ticks_usec()
 	hud.action_menu.close()
 	_set_active_pose(-1)
 	Sfx.play("victory" if result == "victory" else "defeat")
-	hud.show_end(result)
+	hud.show_end(result, _summary_text())
+	if _options.is_autoplay():
+		_check_mirror()
 	combat_finished.emit(result)
 	if _options.quit_on_end:
 		get_tree().create_timer(QUIT_DELAY_S).timeout.connect(_quit)
 
 
 func _quit() -> void:
+	Sfx.stop_all()
+	await get_tree().create_timer(QUIT_AUDIO_RELEASE_S, true, false, true).timeout
 	get_tree().quit(0)
+
+
+func _on_press_judged(action: int, report: Dictionary) -> void:
+	if int(report.get("result", DefenseJudge.Result.DONE)) == DefenseJudge.Result.SUCCESS:
+		_defended[action] = int(_defended.get(action, 0)) + 1
+
+
+func _summary_text() -> String:
+	return "%d enemy hits   parried %d, dodged %d, jumped %d   counters %d" % [_enemy_hits.size(),
+			int(_defended.get(Defense.Outcome.PARRY, 0)), int(_defended.get(Defense.Outcome.DODGE, 0)),
+			int(_defended.get(Defense.Outcome.JUMP, 0)), _counters]
+
+
+## Autoplay guard: the mirror, built from events in playback order, must end equal to the engine.
+func _check_mirror() -> void:
+	var shown := mirror.projection()
+	var truth := CombatMirror.project_snapshot(engine.snapshot())
+	if shown != truth:
+		print("AUTOPLAY_ERROR mirror_mismatch mirror=%s engine=%s" % [var_to_str(shown).replace("\n", " "),
+				var_to_str(truth).replace("\n", " ")])
 
 
 # --- animations -------------------------------------------------------------------------------
@@ -338,8 +380,13 @@ func _play_counter(ev: Dictionary) -> void:
 	var actors: Array[int] = []
 	actors.assign(ev.actors)
 	var team := bool(ev.team)
+	_counters += 1
 	if team:
-		hud.show_center_banner("TEAM COUNTER!", HudStyle.GOLD, TEAM_BANNER_MS)
+		hud.show_center_banner("TEAM COUNTER!", HudStyle.GOLD, _visuals.team_banner_ms)
+	else:
+		var enemy := view.fighter(int(ev.target))
+		if enemy != null:
+			hud.popup("COUNTER!", enemy.head_position(), HudStyle.GOLD)
 	await _strike(actors, int(ev.target), "team_counter" if team else "counter", _take_following(), true)
 
 
@@ -356,22 +403,29 @@ func _strike(actors: Array[int], target: int, sfx: String, results: Array[Dictio
 	var dash_s := float(_tuning.action_dash_ms) / 1000.0
 	var return_s := float(_tuning.action_return_ms) / 1000.0
 	var strike_at := view.strike_point(target)
+	# Several attackers keep part of their formation so each one stays visible at the strike.
+	var formation_centre := Vector3.ZERO
+	for id: int in actors:
+		formation_centre += view.home_of(id)
+	formation_centre /= float(maxi(1, actors.size()))
 	for i: int in actors.size():
 		var v := view.fighter(actors[i])
 		if v == null:
 			continue
-		var spread := Vector3(0.0, 0.0, (float(i) - float(actors.size() - 1) * 0.5) * TEAM_SPREAD)
+		var spread := (v.position - formation_centre) * _visuals.team_strike_spread
 		v.set_pose(FighterView.CharPose.READY)
-		var tween := v.create_tween()
-		tween.tween_property(v, "body_offset", strike_at + spread - v.position, dash_s).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		v.move_body(strike_at + spread - v.position, dash_s, Tween.TRANS_QUAD, Tween.EASE_IN)
 	await _wait_ms(_tuning.action_dash_ms)
 
 	for id: int in actors:
 		var v := view.fighter(id)
 		if v != null:
 			v.set_pose(FighterView.CharPose.STRIKE)
+	var slashes: Array[Tween] = []
 	if enemy != null:
-		view.spawn_slash(enemy.centre_position(), true)
+		# One slash per attacker, a little apart in time, alternating direction.
+		for i: int in actors.size():
+			slashes.append(view.spawn_slash(enemy.centre_position(), i % 2 == 0, 1.0, i * _visuals.team_slash_gap_ms))
 	Sfx.play(sfx)
 	if is_counter:
 		view.camera.shake(_visuals.shake_counter, _visuals.shake_counter_ms)
@@ -386,15 +440,22 @@ func _strike(actors: Array[int], target: int, sfx: String, results: Array[Dictio
 			_show_downed(int(ev.target))
 		event_played.emit(ev)
 	_refresh()
-	await _wait_ms(_tuning.action_hold_ms + (_tuning.hitstop_counter_ms if is_counter else 0))
+	if is_counter and _tuning.hitstop_counter_ms > 0:
+		# Counter hit-stop: the slashes freeze on the impact frame, then play out.
+		for tween: Tween in slashes:
+			tween.set_speed_scale(0.0)
+		await _wait_ms(_tuning.hitstop_counter_ms)
+		for tween: Tween in slashes:
+			if tween.is_valid():
+				tween.set_speed_scale(1.0)
+	await _wait_ms(_tuning.action_hold_ms)
 
 	for id: int in actors:
 		var v := view.fighter(id)
 		if v == null:
 			continue
 		v.set_pose(FighterView.CharPose.IDLE if mirror.is_alive(id) else FighterView.CharPose.DOWN)
-		var tween := v.create_tween()
-		tween.tween_property(v, "body_offset", Vector3.ZERO, return_s).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		v.move_body(Vector3.ZERO, return_s, Tween.TRANS_QUAD, Tween.EASE_OUT)
 	await _wait_ms(_tuning.action_return_ms)
 
 
@@ -455,6 +516,9 @@ func _handle_practice(event: InputEvent, key: Key) -> bool:
 			KEY_T:
 				_options.timing_readout = not _options.timing_readout
 				return true
+			KEY_L:
+				_options.motion_sounds = not _options.motion_sounds
+				return true
 	match key:
 		KEY_F2:
 			# Only while the game waits for a menu choice, never during an enemy attack.
@@ -462,10 +526,12 @@ func _handle_practice(event: InputEvent, key: Key) -> bool:
 				hud.calibration.open()
 			return true
 		KEY_I:
-			_enqueue(_submit(CombatCommands.practice({"invulnerable_party": not bool(mirror.practice.invulnerable_party)})))
+			if engine.phase != CombatEngine.Phase.ENDED:
+				_enqueue(_submit(CombatCommands.practice({"invulnerable_party": not bool(mirror.practice.invulnerable_party)})))
 			return true
 		KEY_O:
-			_enqueue(_submit(CombatCommands.practice({"immortal_enemies": not bool(mirror.practice.immortal_enemies)})))
+			if engine.phase != CombatEngine.Phase.ENDED:
+				_enqueue(_submit(CombatCommands.practice({"immortal_enemies": not bool(mirror.practice.immortal_enemies)})))
 			return true
 		KEY_R:
 			restart_requested.emit()
@@ -473,7 +539,8 @@ func _handle_practice(event: InputEvent, key: Key) -> bool:
 	var index := PRACTICE_ATTACK_KEYS.find(key)
 	if index >= 0:
 		var attacks := _practice_attacks()
-		if index < attacks.size():
+		# The engine is already over while the last strike or attack still plays: nothing to force.
+		if index < attacks.size() and engine.phase != CombatEngine.Phase.ENDED:
 			_enqueue(_submit(CombatCommands.practice({"force_attack": attacks[index].id})))
 		return true
 	return false

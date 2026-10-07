@@ -22,17 +22,25 @@ func _ready() -> void:
 	_settings()
 
 
-## Lag compensation in ms: the calibrated value if there is one, else the tuning default.
+## Lag compensation in ms: the calibrated value if there is one (kept within tuning's
+## calibration_min_ms .. calibration_max_ms, even if the file was edited), else the tuning default.
 static func latency_compensation_ms(tuning: Tuning) -> int:
 	if is_calibrated():
-		return int(_settings().get_value(SECTION_TIMING, KEY_LATENCY, 0))
+		return clamp_latency(int(_settings().get_value(SECTION_TIMING, KEY_LATENCY, 0)), tuning)
 	return tuning.input_latency_compensation_ms if tuning != null else 0
 
 
-## Saves a calibrated lag compensation (overrides the tuning default from now on).
-static func set_latency_compensation_ms(value: int) -> void:
-	_settings().set_value(SECTION_TIMING, KEY_LATENCY, value)
+## Saves a calibrated lag compensation (overrides the tuning default from now on), clamped.
+static func set_latency_compensation_ms(value: int, tuning: Tuning) -> void:
+	_settings().set_value(SECTION_TIMING, KEY_LATENCY, clamp_latency(value, tuning))
 	_save()
+
+
+## `value` limited to the calibration bounds in tuning.
+static func clamp_latency(value: int, tuning: Tuning) -> int:
+	if tuning == null:
+		return value
+	return clampi(value, tuning.calibration_min_ms, tuning.calibration_max_ms)
 
 
 ## True once the player has saved a calibration on this machine.

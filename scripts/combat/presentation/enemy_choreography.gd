@@ -6,7 +6,11 @@ extends RefCounted
 ## exactly at impact; a ground hit launches its wave approach_ms before impact.
 ##
 ## `hits` are the hit dictionaries of a timed_sequence_declared event (at_ms, kind, approach_ms,
-## feint). `approach` in the result is 0 at the enemy's home and 1 at the contact point.
+## feint), optionally with `close_ms`: how long after impact the hit can still be defended on this
+## machine (window late edge + lag compensation; see with_close_times). On an attack's last hit
+## the contact pose is held until contact_after_close_ms past then, so a missed hit's flinch and
+## hurt freeze show the enemy in contact; between hits the hold is capped by the next motion.
+## `approach` in the result is 0 at the enemy's home and 1 at the contact point.
 
 ## Frames of an enemy sheet (DESIGN.md 5.3).
 enum Pose {
@@ -67,15 +71,17 @@ static func sample(hits: Array, t_ms: float, v: CombatVisuals) -> Dictionary:
 			var u := clampf((t_ms - lunge_start) / maxf(1.0, impact - lunge_start), 0.0, 1.0)
 			return _pose(Pose.LUNGE, from + (1.0 - from) * u * u, 1.0 - u)
 
+		var close := float(hit.get("close_ms", 0.0))
 		if is_last:
-			var hold_end := impact + float(v.contact_hold_ms)
+			# Past the close time: the hit lands on the first frame after it, then its hurt freeze.
+			var hold_end := impact + maxf(float(v.contact_hold_ms), close + float(v.contact_after_close_ms))
 			if t_ms < hold_end:
 				return _pose(Pose.CONTACT, 1.0, 0.0)
 			var back := _smooth(_ramp(t_ms, hold_end, hold_end + float(v.return_ms)))
 			return _pose(Pose.IDLE, 1.0 - back, 0.0)
 
 		var available := maxf(0.0, _motion_start(hits, i + 1, v) - impact)
-		var hold := minf(float(v.contact_hold_ms), available * 0.5)
+		var hold := minf(maxf(float(v.contact_hold_ms), close), maxf(0.0, available - float(v.recoil_min_ms)))
 		var recoil := minf(float(v.recoil_ms), available - hold)
 		var recoiled := 1.0 - float(v.recoil_percent) / 100.0
 		if t_ms < impact + hold:
@@ -105,6 +111,23 @@ static func cues(hits: Array, v: CombatVisuals) -> Array[Dictionary]:
 			list.append({"at_ms": _motion_start(hits, i, v), "type": CUE_FEINT, "hit": i})
 		list.append({"at_ms": lunge_start, "type": CUE_LUNGE, "hit": i})
 	list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.at_ms) < float(b.at_ms))
+	return list
+
+
+## A copy of `hits` with `close_ms` set on each hit: the largest late window edge among that hit's
+## prompts plus `latency_ms`, in milliseconds after impact.
+static func with_close_times(hits: Array, prompts: Array, latency_ms: int) -> Array:
+	var late_us: Dictionary = {}
+	for p: Dictionary in prompts:
+		for action: int in (p.windows as Dictionary):
+			var edge := int((p.windows[action] as Array)[1])
+			var h := int(p.hit)
+			late_us[h] = maxi(int(late_us.get(h, edge)), edge)
+	var list: Array = []
+	for i: int in hits.size():
+		var hit: Dictionary = (hits[i] as Dictionary).duplicate()
+		hit["close_ms"] = float(int(late_us.get(i, 0))) / 1000.0 + float(latency_ms)
+		list.append(hit)
 	return list
 
 

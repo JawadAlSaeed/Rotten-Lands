@@ -26,7 +26,7 @@ const SHADOW_FADE_HEIGHT := 1.6
 ## Combatant id this view shows.
 var fighter_id: int = -1
 var is_party: bool = true
-## Body position relative to home (the node's position).
+## Body position relative to home (the node's position). Animate it only through move_body().
 var body_offset: Vector3 = Vector3.ZERO:
 	set = set_body_offset
 
@@ -35,6 +35,9 @@ var _shadow: Sprite3D
 var _material: ShaderMaterial
 var _hframes: int = 1
 var _frame_height_px: float = 48.0
+## Opaque part of the first frame, in pixels measured up from the feet (bottom of the frame).
+var _visible_top_px: float = 48.0
+var _visible_bottom_px: float = 0.0
 var _pixel_size: float = 0.045
 var _head_factor: float = 1.0
 var _base_pose: int = 0
@@ -43,6 +46,8 @@ var _override_until_us: int = 0
 var _flash_until_us: int = 0
 var _flash_length_us: int = 1
 var _flash_strength: float = 1.0
+## The one tween allowed to move the body (see move_body).
+var _move_tween: Tween
 
 
 ## Builds the sprite and shadow. `fallback_size` is the sheet size to fake if the art is missing.
@@ -55,6 +60,7 @@ func setup(id: int, party: bool, sheet_path: String, hframes: int, frame_size: V
 	_head_factor = visuals.head_height_factor
 	var texture := AssetLoader.texture(sheet_path, Vector2i(frame_size.x * _hframes, frame_size.y))
 	_frame_height_px = float(texture.get_height())
+	_measure_visible(texture)
 
 	_sprite = Sprite3D.new()
 	_sprite.name = "Body"
@@ -72,6 +78,7 @@ func setup(id: int, party: bool, sheet_path: String, hframes: int, frame_size: V
 	_material.shader = SHADER
 	_material.set_shader_parameter("sprite_texture", texture)
 	_material.set_shader_parameter("glow_color", visuals.windup_glow_color)
+	_material.set_shader_parameter("glow_strength", visuals.windup_glow_strength)
 	_sprite.material_override = _material
 	add_child(_sprite)
 
@@ -121,6 +128,21 @@ func clear_timed_pose() -> void:
 	_override_pose = -1
 
 
+## Moves the body to `to` (relative to home) over `seconds`, replacing any movement still in
+## progress, so two movements never fight over the body. 0 seconds snaps (and just stops any
+## movement when `to` is the current offset).
+func move_body(to: Vector3, seconds: float, trans: Tween.TransitionType = Tween.TRANS_LINEAR,
+		ease: Tween.EaseType = Tween.EASE_IN_OUT) -> void:
+	if _move_tween != null and _move_tween.is_valid():
+		_move_tween.kill()
+	_move_tween = null
+	if seconds <= 0.0:
+		body_offset = to
+		return
+	_move_tween = create_tween()
+	_move_tween.tween_property(self, "body_offset", to, seconds).set_trans(trans).set_ease(ease)
+
+
 func set_body_offset(value: Vector3) -> void:
 	body_offset = value
 	if _sprite == null:
@@ -164,11 +186,34 @@ func body_position() -> Vector3:
 	return global_position + body_offset
 
 
+## Height of the visible art (opaque pixels of the first frame) in world units.
+func visible_height() -> float:
+	return _visible_top_px * _pixel_size
+
+
 ## Above the head, for popups and icons.
 func head_position() -> Vector3:
-	return body_position() + Vector3(0.0, sprite_height() * _head_factor, 0.0)
+	return body_position() + Vector3(0.0, visible_height() * _head_factor, 0.0)
 
 
-## Middle of the body, for sparks and rings.
+## Middle of the visible body, for sparks, slashes and rings.
 func centre_position() -> Vector3:
-	return body_position() + Vector3(0.0, sprite_height() * 0.5, 0.0)
+	return body_position() + Vector3(0.0, (_visible_top_px + _visible_bottom_px) * 0.5 * _pixel_size, 0.0)
+
+
+## Finds the opaque rows of frame 0, so popups sit on the art and not on empty frame space.
+## Falls back to the whole frame if the image cannot be read.
+func _measure_visible(texture: Texture2D) -> void:
+	_visible_top_px = _frame_height_px
+	_visible_bottom_px = 0.0
+	var image := texture.get_image()
+	if image == null or image.is_empty():
+		return
+	if image.is_compressed() and image.decompress() != OK:
+		return
+	var frame_w := image.get_width() / _hframes
+	var used := image.get_region(Rect2i(0, 0, frame_w, image.get_height())).get_used_rect()
+	if used.size.y <= 0:
+		return
+	_visible_top_px = _frame_height_px - float(used.position.y)
+	_visible_bottom_px = _frame_height_px - float(used.end.y)

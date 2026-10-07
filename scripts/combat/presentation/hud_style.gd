@@ -29,6 +29,16 @@ const RING_GROUND := Color(1.0, 0.6, 0.15)
 
 const OUTLINE_RATIO: float = 0.2
 
+## Xbox-style names for pad buttons in control hints.
+const PAD_BUTTON_NAMES := {
+	JOY_BUTTON_A: "A", JOY_BUTTON_B: "B", JOY_BUTTON_X: "X", JOY_BUTTON_Y: "Y",
+	JOY_BUTTON_BACK: "View", JOY_BUTTON_GUIDE: "Guide", JOY_BUTTON_START: "Menu",
+	JOY_BUTTON_LEFT_STICK: "LS", JOY_BUTTON_RIGHT_STICK: "RS",
+	JOY_BUTTON_LEFT_SHOULDER: "LB", JOY_BUTTON_RIGHT_SHOULDER: "RB",
+	JOY_BUTTON_DPAD_UP: "D-pad up", JOY_BUTTON_DPAD_DOWN: "D-pad down",
+	JOY_BUTTON_DPAD_LEFT: "D-pad left", JOY_BUTTON_DPAD_RIGHT: "D-pad right",
+}
+
 
 static func label_settings(size: int, color: Color = TEXT) -> LabelSettings:
 	var s := LabelSettings.new()
@@ -78,6 +88,26 @@ static func set_bar_color(b: ProgressBar, fill: Color) -> void:
 	var fg := b.get_theme_stylebox("fill") as StyleBoxFlat
 	if fg != null:
 		fg.bg_color = fill
+
+
+## "Space / RB": the first keyboard key and the first pad button of an input action, read from
+## the Input Map so hints follow remaps made in Project Settings > Input Map.
+static func binding_text(action: StringName) -> String:
+	var key := ""
+	var pad := ""
+	if InputMap.has_action(action):
+		for ev: InputEvent in InputMap.action_get_events(action):
+			if key.is_empty() and ev is InputEventKey:
+				var k := ev as InputEventKey
+				key = OS.get_keycode_string(k.physical_keycode if k.physical_keycode != KEY_NONE else k.keycode)
+			elif pad.is_empty() and ev is InputEventJoypadButton:
+				var button := (ev as InputEventJoypadButton).button_index
+				pad = String(PAD_BUTTON_NAMES.get(button, "Button %d" % button))
+	var parts := PackedStringArray()
+	for part: String in [key, pad]:
+		if not part.is_empty():
+			parts.append(part)
+	return " / ".join(parts) if not parts.is_empty() else "(not bound)"
 
 
 ## "+12" / "-8" for a millisecond offset.

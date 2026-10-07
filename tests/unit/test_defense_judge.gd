@@ -33,7 +33,7 @@ func _prompt(idx: int, hit: int, character: int, at_ms: int, kind: int) -> Dicti
 
 
 func _judge(prompts: Array, compensation_ms: int = 0) -> DefenseJudge:
-	var judge := DefenseJudge.new(LOCKOUT_MS, compensation_ms)
+	var judge := DefenseJudge.new(LOCKOUT_MS, compensation_ms, _tuning.press_reach_back_max_ms, _tuning.late_press_report_ms)
 	judge.set_prompts(prompts)
 	return judge
 
@@ -52,7 +52,7 @@ func test_default_windows_match_design() -> void:
 	assert_eq(_tuning.window_edges_us(_tuning.jump_window_ms), Vector2i(-143000, 77000))
 	assert_eq(Defense.build_windows(Fx.NORMAL, _tuning), {DODGE: [-162500, 87500], PARRY: [-97500, 52500]})
 	assert_eq(Defense.build_windows(Fx.GROUND, _tuning), {JUMP: [-143000, 77000]})
-	assert_eq(DefenseJudge.MAX_STAMP_SLACK_US, 100000, "DESIGN 3.1: reach back at most 100 ms")
+	assert_eq(_tuning.press_reach_back_max_ms, 100, "DESIGN 3.1: reach back at most 100 ms")
 
 
 func test_window_edges_are_inclusive_to_the_microsecond() -> void:
@@ -235,7 +235,7 @@ func test_interval_presses() -> void:
 	assert_eq(r.result, SUCCESS, "reach-back capped at exactly the late edge still counts")
 	assert_eq(r.offset_us, 102500)
 	r = _single(Fx.NORMAL).press(PARRY, 1152501, 900000)
-	assert_eq(r.result, WHIFF, "a longer reach-back is capped at MAX_STAMP_SLACK_US")
+	assert_eq(r.result, WHIFF, "a longer reach-back is capped at press_reach_back_max_ms")
 	assert_eq(r.reason, LATE)
 	r = _single(Fx.NORMAL).press(PARRY, 902499, 850000)
 	assert_eq([r.result, r.reason], [WHIFF, EARLY], "an interval wholly before the window")
@@ -279,7 +279,7 @@ func test_judge_results_are_accepted_by_the_engine() -> void:
 	var attack := Fx.attack("combo", [Fx.hit(900, Fx.NORMAL, 50), Fx.hit(1500, Fx.GROUND, 80)], Fx.PARTY)
 	var engine := CombatEngine.new(Fx.setup([attack]))
 	var declared := Fx.first_of(engine.start(), "timed_sequence_declared")
-	var judge := DefenseJudge.new(_tuning.whiff_lockout_ms, 0)
+	var judge := DefenseJudge.new(_tuning.whiff_lockout_ms, 0, _tuning.press_reach_back_max_ms, _tuning.late_press_report_ms)
 	judge.set_prompts(declared.prompts as Array)
 	var events: Array[Dictionary] = []
 	assert_eq(judge.press(PARRY, 905000).prompts, [0, 1, 2])
@@ -290,3 +290,100 @@ func test_judge_results_are_accepted_by_the_engine() -> void:
 	var counter := Fx.first_of(events, "counter")
 	assert_eq(counter.get("team"), true, "a perfect party-wide defence becomes a team counter")
 	assert_eq(Fx.of_type(events, "prompt_resolved")[0].offset_us, 5000, "the judge's offset reaches the engine")
+
+
+func test_late_press_after_the_hit_landed_reports_late() -> void:
+	var judge := _single(Fx.NORMAL)
+	assert_eq(judge.advance(AT + 100000), [0], "the hit lands")
+	var r := judge.press(PARRY, AT + 150000)
+	assert_eq([r.result, r.reason, r.offset_us, r.hit, r.prompts], [WHIFF, LATE, 150000, 0, []])
+	r = _single(Fx.GROUND).press(DODGE, AT + 200000)
+	assert_eq([r.result, r.reason], [WHIFF, WRONG_ACTION], "a late wrong button is still the wrong button")
+	var old := _single(Fx.NORMAL)
+	old.advance(AT + 100000)
+	var limit := _tuning.late_press_report_ms * 1000
+	assert_eq(old.press(PARRY, AT + limit).reason, LATE, "late_press_report_ms is inclusive")
+	assert_eq(_single(Fx.NORMAL).press(PARRY, AT + limit + 1).result, DONE, "much later presses are ignored")
+
+
+func test_late_press_between_hits_blames_the_nearer_hit() -> void:
+	var flurry := [_prompt(0, 0, 0, 900, Fx.NORMAL), _prompt(1, 1, 0, 1200, Fx.NORMAL)]
+	var judge := _judge(flurry)
+	judge.advance(1000000)
+	var r := judge.press(PARRY, 1050000)
+	assert_eq([r.result, r.reason, r.offset_us, r.hit], [WHIFF, LATE, 150000, 0], "late on hit 0, not early on hit 1")
+	judge = _judge(flurry)
+	judge.advance(1000000)
+	r = judge.press(PARRY, 1060000)
+	assert_eq([r.result, r.reason, r.offset_us, r.hit], [WHIFF, EARLY, -140000, 1], "nearer to hit 1: early on hit 1")
+	var parried := _judge(flurry)
+	assert_eq(parried.press(PARRY, 900000).result, SUCCESS)
+	r = parried.press(PARRY, 1040000)
+	assert_eq([r.reason, r.hit], [EARLY, 1], "a parried hit is never blamed for a late press")
+
+
+func test_a_prompt_expired_by_a_capped_press_is_reported_by_advance() -> void:
+	# A 190 ms frame stall: the press interval is capped at 100 ms, so press() itself expires hit 0.
+	var judge := _judge([_prompt(0, 0, 0, 900, Fx.NORMAL), _prompt(1, 1, 0, 1200, Fx.NORMAL)], 30)
+	assert_eq(judge.advance(960000), [])
+	var r := judge.press(PARRY, 1150000, 960000)
+	assert_eq(r.result, SUCCESS)
+	assert_eq(r.prompts, [1])
+	assert_eq(judge.advance(1151000), [0], "hit 0 still gets its hit-taken feedback")
+	assert_eq(judge.advance(1152000), [], "reported once")
+
+
+func test_no_late_report_across_a_defended_hit() -> void:
+	var flurry := [_prompt(0, 0, 0, 900, Fx.NORMAL), _prompt(1, 1, 0, 1200, Fx.NORMAL), _prompt(2, 2, 0, 1500, Fx.NORMAL)]
+	var judge := _judge(flurry)
+	assert_eq(judge.press(PARRY, 880000).result, SUCCESS)
+	assert_eq(judge.advance(1300000), [1], "hit 1 lands")
+	assert_eq(judge.press(PARRY, 1490000).result, SUCCESS, "the last hit is parried")
+	assert_eq(judge.press(PARRY, 1560000).result, DONE, "a double tap after the final parry is not LATE on hit 1")
+	var mid := _judge(flurry)
+	mid.advance(1000000)
+	assert_eq(mid.press(PARRY, 1110000).result, SUCCESS, "hit 1 parried early")
+	var r := mid.press(PARRY, 1190000)
+	assert_eq([r.reason, r.hit], [EARLY, 2], "judged against the next hit, not LATE on hit 0")
+
+
+func test_an_honest_late_press_costs_only_its_own_hit() -> void:
+	var flurry := [_prompt(0, 0, 0, 900, Fx.NORMAL), _prompt(1, 1, 0, 1200, Fx.NORMAL), _prompt(2, 2, 0, 1500, Fx.NORMAL)]
+	var judge := _judge(flurry)
+	var late := judge.press(PARRY, 970000)
+	assert_eq([late.result, late.reason, late.hit], [WHIFF, LATE, 0])
+	assert_eq(judge.press(PARRY, 1180000).result, SUCCESS, "on time for hit 1 after a late press on hit 0")
+	assert_eq(judge.press(PARRY, 1480000).result, SUCCESS)
+	var close := [_prompt(0, 0, 0, 900, Fx.NORMAL), _prompt(1, 1, 0, 1100, Fx.NORMAL), _prompt(2, 2, 0, 1400, Fx.NORMAL)]
+	var masher := _judge(close)
+	assert_eq(masher.press(PARRY, 900000).result, SUCCESS)
+	assert_eq(masher.press(PARRY, 1160000).reason, LATE, "late on hit 1, but only 260 ms after the last press")
+	assert_eq(masher.press(PARRY, 1380000).result, LOCKED, "not isolated: the full lockout applies")
+	var honest := _judge(close)
+	assert_eq(honest.press(PARRY, 1160000).reason, LATE)
+	assert_eq(honest.press(PARRY, 1380000).result, SUCCESS, "isolated: locked only until hit 2's window opens")
+	var early := _judge(flurry)
+	assert_eq(early.press(PARRY, 1070000).reason, EARLY)
+	assert_eq(early.press(PARRY, 1180000).result, LOCKED, "an early whiff keeps the full lockout")
+
+
+func test_voided_prompts_never_match_or_report_late() -> void:
+	var judge := _judge([_prompt(0, 0, 0, 900, Fx.NORMAL), _prompt(1, 1, 0, 1200, Fx.NORMAL)])
+	judge.advance(1000000)
+	judge.void_prompts([1])
+	var r := judge.press(PARRY, 1200000)
+	assert_ne(r.result, SUCCESS, "a voided hit cannot be parried")
+	assert_ne(r.hit, 1, "and is never the hit a press is judged against")
+	assert_eq(judge.pop_ready().size(), 2, "voided prompts are still released in order")
+	var landed := _judge([_prompt(0, 0, 0, 900, Fx.NORMAL)])
+	landed.advance(1000000)
+	landed.void_prompts([0])
+	assert_eq(landed.press(PARRY, 1100000).result, DONE, "a voided hit is never blamed for a late press")
+
+
+func test_a_very_late_press_does_not_lock_a_hit_whose_window_is_open() -> void:
+	# +140 ms after hit 0: hit 1's dodge window (from -162.5 ms) is already open.
+	var judge := _judge([_prompt(0, 0, 0, 900, Fx.NORMAL), _prompt(1, 1, 0, 1200, Fx.NORMAL), _prompt(2, 2, 0, 1500, Fx.NORMAL)])
+	var late := judge.press(PARRY, 1040000)
+	assert_eq([late.result, late.reason, late.hit, late.offset_us], [WHIFF, LATE, 0, 140000])
+	assert_eq(judge.press(PARRY, 1180000).result, SUCCESS)

@@ -1,7 +1,7 @@
 extends SceneTree
 ## Generates the placeholder art and sounds (DESIGN.md 5.3): pixel sprites drawn with Image and
-## sounds synthesized into 16-bit mono WAV files. Character, enemy and sound paths come from the
-## data files; FX, environment and UI sprites use the shared contract paths below.
+## sounds synthesized into 16-bit mono WAV files. Every path comes from the data files: characters,
+## enemies, the sound library and data/presentation/combat_visuals.tres (FX, stage and UI art).
 ## Only missing files are written, so real art dropped into assets/ is never overwritten.
 ## Every file draws from its own fixed seed, so re-runs give identical files.
 ## Run headless, importing before (so data classes resolve) and after (so Godot imports the files):
@@ -13,16 +13,7 @@ extends SceneTree
 const CHARACTER_DIR := "res://data/characters"
 const ENEMY_DIR := "res://data/enemies"
 const SFX_LIBRARY_PATH := "res://data/audio/sfx_library.tres"
-
-const SPARK_PATH := "res://assets/sprites/fx/spark.png"
-const SHOCKWAVE_PATH := "res://assets/sprites/fx/shockwave.png"
-const SHADOW_PATH := "res://assets/sprites/fx/shadow.png"
-const SLASH_PATH := "res://assets/sprites/fx/slash.png"
-const FLOOR_PATH := "res://assets/sprites/env/floor_tile.png"
-const BACKDROP_PATH := "res://assets/sprites/env/backdrop.png"
-const LOCK_PATH := "res://assets/sprites/ui/lock.png"
-const AP_PIP_PATH := "res://assets/sprites/ui/ap_pip.png"
-const AP_PIP_EMPTY_PATH := "res://assets/sprites/ui/ap_pip_empty.png"
+const VISUALS_PATH := "res://data/presentation/combat_visuals.tres"
 
 ## Base seed; each file mixes in a hash of its own path.
 const SEED := 20261006
@@ -284,31 +275,45 @@ func _make_enemies() -> void:
 			_save_png(_portrait(style, data.color, true), data.portrait_path)
 
 
+## The presentation data that names the FX, stage and UI art (its defaults if the file is missing).
+func _visuals() -> CombatVisuals:
+	var visuals: CombatVisuals = null
+	if ResourceLoader.exists(VISUALS_PATH):
+		visuals = load(VISUALS_PATH) as CombatVisuals
+	if visuals == null:
+		push_warning("gen_placeholders: no %s, using the CombatVisuals defaults" % VISUALS_PATH)
+		visuals = CombatVisuals.new()
+	return visuals
+
+
 func _make_fx() -> void:
-	if _wants(SPARK_PATH):
-		_save_png(_spark(), SPARK_PATH)
-	if _wants(SHOCKWAVE_PATH):
-		_save_png(_shockwave(), SHOCKWAVE_PATH)
-	if _wants(SHADOW_PATH):
-		_save_png(_shadow(), SHADOW_PATH)
-	if _wants(SLASH_PATH):
-		_save_png(_slash(), SLASH_PATH)
+	var v := _visuals()
+	if _wants(v.spark_path):
+		_save_png(_spark(), v.spark_path)
+	if _wants(v.shockwave_path):
+		_save_png(_shockwave(), v.shockwave_path)
+	if _wants(v.shadow_path):
+		_save_png(_shadow(), v.shadow_path)
+	if _wants(v.slash_path):
+		_save_png(_slash(), v.slash_path)
 
 
 func _make_env() -> void:
-	if _wants(FLOOR_PATH):
-		_save_png(_floor_tile(), FLOOR_PATH)
-	if _wants(BACKDROP_PATH):
-		_save_png(_backdrop(), BACKDROP_PATH)
+	var v := _visuals()
+	if _wants(v.floor_tile_path):
+		_save_png(_floor_tile(), v.floor_tile_path)
+	if _wants(v.backdrop_path):
+		_save_png(_backdrop(), v.backdrop_path)
 
 
 func _make_ui() -> void:
-	if _wants(LOCK_PATH):
-		_save_png(_lock_icon(), LOCK_PATH)
-	if _wants(AP_PIP_PATH):
-		_save_png(_ap_pip(true), AP_PIP_PATH)
-	if _wants(AP_PIP_EMPTY_PATH):
-		_save_png(_ap_pip(false), AP_PIP_EMPTY_PATH)
+	var v := _visuals()
+	if _wants(v.lock_icon_path):
+		_save_png(_lock_icon(), v.lock_icon_path)
+	if _wants(v.ap_pip_path):
+		_save_png(_ap_pip(true), v.ap_pip_path)
+	if _wants(v.ap_pip_empty_path):
+		_save_png(_ap_pip(false), v.ap_pip_empty_path)
 
 
 func _make_sounds() -> void:

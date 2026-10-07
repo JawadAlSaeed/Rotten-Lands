@@ -11,6 +11,7 @@ uniform vec4 flash_color : source_color = vec4(1.0);
 uniform float flash_amount : hint_range(0.0, 1.0) = 0.0;
 uniform vec4 glow_color : source_color = vec4(1.0, 0.45, 0.2, 1.0);
 uniform float glow_amount : hint_range(0.0, 1.0) = 0.0;
+uniform float glow_strength : hint_range(0.0, 1.0) = 0.35;
 uniform float grey_amount : hint_range(0.0, 1.0) = 0.0;
 
 void vertex() {
@@ -30,7 +31,7 @@ void fragment() {
 	vec3 color = texel.rgb * tint.rgb;
 	float luma = dot(color, vec3(0.299, 0.587, 0.114));
 	color = mix(color, vec3(luma * 0.6), grey_amount);
-	color += glow_color.rgb * glow_amount * 0.6;
+	color += glow_color.rgb * glow_amount * glow_strength;
 	color = mix(color, flash_color.rgb, flash_amount);
 	ALBEDO = color;
 }

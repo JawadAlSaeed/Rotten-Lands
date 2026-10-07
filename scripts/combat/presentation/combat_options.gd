@@ -17,9 +17,11 @@ var autoplay_mode: String = ""
 var quit_on_end: bool = false
 ## -1 when no --seed was given.
 var seed_override: int = -1
-## Session toggles (F1 overlay; not saved): telegraph flash (F) and timing readout (T).
+## Session toggles (F1 overlay; not saved): telegraph flash (F), timing readout (T) and the
+## enemy's motion sounds (L: lunge whoosh and slam).
 var telegraph_flash: bool = true
 var timing_readout: bool = true
+var motion_sounds: bool = true
 ## Defence statistics for the F1 overlay, kept across restarts.
 var stats := DefenseStats.new()
 
@@ -29,6 +31,7 @@ static func from_args(args: PackedStringArray, tuning: Tuning) -> CombatOptions:
 	if tuning != null:
 		options.telegraph_flash = tuning.show_telegraph_flash
 		options.timing_readout = tuning.show_timing_feedback
+		options.motion_sounds = tuning.play_motion_sounds
 	for arg: String in args:
 		if arg == "--autoplay":
 			options.autoplay_mode = AUTOPLAY_PERFECT

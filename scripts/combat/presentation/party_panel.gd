@@ -1,7 +1,8 @@
 class_name PartyPanel
 extends PanelContainer
 ## One party member's panel at the bottom of the screen: name, HP bar and numbers, AP gems (up to
-## max_ap), DOWN state and the active-turn highlight. Values come from the mirror.
+## max_ap), DOWN state, the active-turn highlight (gold) and the "being attacked" highlight (red).
+## Values come from the mirror.
 
 const NAME_SIZE: int = 30
 const HP_TEXT_SIZE: int = 24
@@ -24,6 +25,8 @@ var _ap_label: Label
 var _pips: Array[TextureRect] = []
 var _pip_full: Texture2D
 var _pip_empty: Texture2D
+var _active: bool = false
+var _targeted: bool = false
 
 
 func setup(id: int, display_name: String, accent: Color, max_ap: int, visuals: CombatVisuals) -> void:
@@ -95,5 +98,21 @@ func refresh(f: Dictionary, active: bool) -> void:
 		_pips[i].texture = _pip_full if i < ap else _pip_empty
 	_state_label.text = "" if alive else "DOWN"
 	modulate = Color.WHITE if alive else Color(0.6, 0.6, 0.65)
-	_style.border_color = HudStyle.GOLD if active else HudStyle.PANEL_BORDER
-	_style.set_border_width_all(ACTIVE_BORDER_PX if active else IDLE_BORDER_PX)
+	_active = active
+	_apply_border()
+
+
+## Red border while an enemy attack targets this character.
+func set_targeted(targeted: bool) -> void:
+	_targeted = targeted
+	_apply_border()
+
+
+func _apply_border() -> void:
+	var color := HudStyle.PANEL_BORDER
+	if _targeted:
+		color = HudStyle.LATE
+	elif _active:
+		color = HudStyle.GOLD
+	_style.border_color = color
+	_style.set_border_width_all(ACTIVE_BORDER_PX if _targeted or _active else IDLE_BORDER_PX)
