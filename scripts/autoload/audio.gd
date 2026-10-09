@@ -16,11 +16,7 @@ var _warned: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	if ResourceLoader.exists(LIBRARY_PATH):
-		_library = load(LIBRARY_PATH) as SfxLibrary
-	if _library == null:
-		push_warning("Audio: no sound library at %s" % LIBRARY_PATH)
-		_library = SfxLibrary.new()
+	_ensure_library()
 	for i: int in POOL_SIZE:
 		var player := AudioStreamPlayer.new()
 		player.name = "Sfx%d" % i
@@ -30,12 +26,15 @@ func _ready() -> void:
 
 ## Plays a cue. `volume_offset_db` is added to the cue's own volume.
 func play(cue_name: String, volume_offset_db: float = 0.0, pitch_scale: float = 1.0) -> void:
-	var cue := _library.find(cue_name)
+	var cue := _ensure_library().find(cue_name)
 	if cue == null:
 		_warn_once(cue_name, "Audio: unknown cue '%s' (add it to %s)" % [cue_name, LIBRARY_PATH])
 		return
 	var stream := _stream_for(cue)
 	if stream == null:
+		return
+	if _pool.is_empty():
+		_warn_once("_no_pool", "Audio: play('%s') before the Audio node is ready" % cue_name)
 		return
 	var player := _pool[_next_player]
 	_next_player = (_next_player + 1) % _pool.size()
@@ -50,13 +49,27 @@ func play(cue_name: String, volume_offset_db: float = 0.0, pitch_scale: float = 
 
 ## Loads every cue now so the first parry sound has no loading hitch.
 func preload_all() -> void:
-	for cue: SfxCue in _library.cues:
+	for cue: SfxCue in _ensure_library().cues:
 		if cue != null:
 			_stream_for(cue)
 
 
+## True if the library defines `cue_name` (whether or not its file exists).
 func has_cue(cue_name: String) -> bool:
-	return _library.find(cue_name) != null
+	return _ensure_library().find(cue_name) != null
+
+
+## Loads the library on first use, so calls made before _ready (for example from another
+## autoload) work instead of crashing.
+func _ensure_library() -> SfxLibrary:
+	if _library != null:
+		return _library
+	if ResourceLoader.exists(LIBRARY_PATH):
+		_library = load(LIBRARY_PATH) as SfxLibrary
+	if _library == null:
+		push_warning("Audio: no sound library at %s" % LIBRARY_PATH)
+		_library = SfxLibrary.new()
+	return _library
 
 
 func _stream_for(cue: SfxCue) -> AudioStream:
@@ -65,10 +78,28 @@ func _stream_for(cue: SfxCue) -> AudioStream:
 	var stream: AudioStream = null
 	if not cue.path.is_empty() and ResourceLoader.exists(cue.path):
 		stream = load(cue.path) as AudioStream
+	elif cue.path.ends_with(".wav") and FileAccess.file_exists(cue.path):
+		# Dropped in but not imported yet: read the WAV straight from disk.
+		stream = AudioStreamWAV.load_from_file(cue.path)
+		if stream != null:
+			_warn_once(cue.name, "Audio: '%s' is not imported yet; read the raw file" % cue.path)
 	if stream == null:
 		_warn_once(cue.name, "Audio: cue '%s' has no playable file at '%s'" % [cue.name, cue.path])
 	_streams[cue.name] = stream
 	return stream
+
+
+## Stops every sound and releases the streams. Called on quit, because quitting while a sound
+## still plays leaks its playback and Godot reports "resources still in use at exit".
+func stop_all() -> void:
+	for player: AudioStreamPlayer in _pool:
+		player.stop()
+		player.stream = null
+	_streams.clear()
+
+
+func _exit_tree() -> void:
+	stop_all()
 
 
 func _warn_once(key: String, message: String) -> void:

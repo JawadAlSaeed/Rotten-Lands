@@ -2,24 +2,29 @@ class_name AssetLoader
 extends RefCounted
 ## Loads art from paths stored in data files. A missing file gives a visible checkerboard
 ## placeholder and one warning, never a crash. Replace art by dropping a file with the same name
-## into assets/ and opening the editor once so Godot imports it.
+## into assets/ (run_game.bat or opening the editor imports it). A dropped-in file that has not
+## been imported yet is read straight from disk, so it still shows up in a run from the editor.
 
 static var _fallbacks: Dictionary = {}
+static var _raw: Dictionary = {}
 static var _warned: Dictionary = {}
 
 
-## The texture at `path`, or a magenta/black checkerboard if it is missing.
+## The texture at `path`, or a magenta/black checkerboard of `fallback_size` if it is missing.
 static func texture(path: String, fallback_size: Vector2i = Vector2i(32, 32)) -> Texture2D:
-	if not path.is_empty() and ResourceLoader.exists(path):
-		var tex := load(path) as Texture2D
-		if tex != null:
-			return tex
-	if not _warned.has(path):
-		_warned[path] = true
-		push_warning("AssetLoader: missing texture '%s', using placeholder" % path)
+	if not path.is_empty():
+		if ResourceLoader.exists(path):
+			var tex := load(path) as Texture2D
+			if tex != null:
+				return tex
+		var raw := _raw_texture(path)
+		if raw != null:
+			return raw
+	_warn_once(path, "AssetLoader: missing texture '%s', using placeholder" % path)
 	return fallback_texture(fallback_size)
 
 
+## A magenta/black checkerboard (4 px squares), cached per size.
 @warning_ignore("integer_division")
 static func fallback_texture(size: Vector2i) -> Texture2D:
 	if _fallbacks.has(size):
@@ -32,3 +37,24 @@ static func fallback_texture(size: Vector2i) -> Texture2D:
 	var tex := ImageTexture.create_from_image(img)
 	_fallbacks[size] = tex
 	return tex
+
+
+## Reads an image file that exists on disk but has no import yet (null if there is none).
+static func _raw_texture(path: String) -> Texture2D:
+	if _raw.has(path):
+		return _raw[path]
+	var tex: Texture2D = null
+	if FileAccess.file_exists(path):
+		var img := Image.load_from_file(path)
+		if img != null and not img.is_empty():
+			tex = ImageTexture.create_from_image(img)
+			_warn_once(path, "AssetLoader: '%s' is not imported yet; read the raw file" % path)
+	_raw[path] = tex
+	return tex
+
+
+static func _warn_once(key: String, message: String) -> void:
+	if _warned.has(key):
+		return
+	_warned[key] = true
+	push_warning(message)

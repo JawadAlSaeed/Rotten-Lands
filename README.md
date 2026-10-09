@@ -26,11 +26,17 @@ name and all art and sound are placeholders for now.
 | Back | Esc / Q | B |
 | Debug overlay | F1 | View |
 
+Practice keys (keyboard): 1 to 5 pick the enemy's next attack, I party cannot die, O enemy cannot
+die, R restart, F1 stats (inside: R training ring, F telegraph flash, T timing readout, L enemy
+motion sounds), F2 lag calibration (while the action menu is open).
+
 ## Tests
 
 Double-click `run_tests.bat`. It runs every unit test without opening a window.
 
 ## Tuning
 
-All timing windows and damage numbers are in `data/tuning/tuning.tres`. Open it in the Godot
-editor (double-click it in the FileSystem panel) and change values in the Inspector.
+Timing windows, damage and other rules are in `data/tuning/tuning.tres`. How things look and feel
+on screen (flashes, shake, poses, layout) is in `data/presentation/combat_visuals.tres`. Open
+either in the Godot editor (double-click it in the FileSystem panel) and change values in the
+Inspector.
